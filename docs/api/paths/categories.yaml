@@ -2,6 +2,7 @@
   get:
     operationId: listCategories
     summary: List categories
+    description: Every category, client and manager alike — there is no active/disabled distinction at the category level.
     tags: [categories]
     security: []
     parameters:
@@ -72,6 +73,7 @@
   get:
     operationId: getCategory
     summary: Get a category by id
+    description: Returns the category regardless of whether it currently has any products.
     tags: [categories]
     security: []
     parameters:

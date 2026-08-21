@@ -30,6 +30,7 @@
   get:
     operationId: listPromoCodes
     summary: List promo codes
+    description: Manager only. `isActive` and `includeExpired` filter independently of each other.
     tags: [promo-codes]
     parameters:
       - name: isActive
@@ -93,6 +94,7 @@
   get:
     operationId: getPromoCode
     summary: Get a promo code by id
+    description: Manager only — clients only ever interact with a promo code through `validatePromoCode`.
     tags: [promo-codes]
     parameters:
       - $ref: ../components/parameters.yaml#/PromoCodeIdParam

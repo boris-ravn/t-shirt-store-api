@@ -2,6 +2,7 @@
   get:
     operationId: getCurrentUser
     summary: Get the caller's own profile
+    description: Resolves from the access token — there is no path parameter, so a caller can never read another user's profile through this operation.
     tags: [users]
     responses:
       "200":

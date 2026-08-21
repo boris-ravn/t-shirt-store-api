@@ -69,6 +69,7 @@
   patch:
     operationId: updateCartItem
     summary: Set a cart item's quantity
+    description: 'The new quantity is absolute, not a delta — see `UpdateCartItemRequest`.'
     tags: [cart]
     parameters:
       - $ref: ../components/parameters.yaml#/CartItemIdParam

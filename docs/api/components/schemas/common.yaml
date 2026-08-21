@@ -1,0 +1,99 @@
+Money:
+  type: object
+  description: >
+    An amount in minor units of `currency` (e.g. cents for USD). Never a
+    decimal. May be negative only where a discount is expressed.
+  properties:
+    amount:
+      type: integer
+      description: Minor units of `currency`.
+    currency:
+      type: string
+      pattern: ^[A-Z]{3}$
+      description: ISO 4217 currency code, uppercase.
+  required:
+    - amount
+    - currency
+  additionalProperties: false
+
+PaginationMeta:
+  type: object
+  description: Pagination metadata attached to every collection endpoint response.
+  properties:
+    total:
+      type: integer
+      minimum: 0
+      description: Total number of items matching the query, across all pages.
+    limit:
+      type: integer
+      minimum: 1
+      description: The `limit` that produced this page.
+    offset:
+      type: integer
+      minimum: 0
+      description: The `offset` that produced this page.
+  required:
+    - total
+    - limit
+    - offset
+  additionalProperties: false
+
+ValidationErrorDetail:
+  type: object
+  description: One field-level validation failure.
+  properties:
+    field:
+      type: string
+      description: >
+        Dot/bracket notation path to the offending field, e.g.
+        `items[0].quantity`.
+    message:
+      type: string
+      description: Human-readable explanation of why this field failed.
+  required:
+    - field
+    - message
+  additionalProperties: false
+
+Problem:
+  type: object
+  description: >
+    RFC 9457 problem details. Served as `application/problem+json` on every
+    error response in this contract.
+  properties:
+    type:
+      type: string
+      format: uri
+      description: >
+        Stable identifier for the failure kind, e.g.
+        `https://api.tshirt-store.example/problems/validation-error`.
+    title:
+      type: string
+      description: Short, human-readable summary, constant per `type`.
+    status:
+      type: integer
+      description: Duplicates the HTTP status code, per RFC 9457.
+    detail:
+      type: string
+      description: >
+        Specific to this occurrence of the problem. Never leaks internals
+        such as a stack trace or a raw database error.
+    instance:
+      type: string
+      format: uri
+      description: The request path that failed.
+    errors:
+      type: array
+      description: >
+        Extension member. Present only when `type` is `validation-error`.
+      items:
+        $ref: ./common.yaml#/ValidationErrorDetail
+  required:
+    - type
+    - title
+    - status
+  additionalProperties: true
+  # Other problem types carry their own extension members (requiredRole,
+  # resource, expiresAt, ...) per the registry in openapi-plan.md §3.4 —
+  # additionalProperties stays true so each can be declared per-response
+  # without widening this base schema.

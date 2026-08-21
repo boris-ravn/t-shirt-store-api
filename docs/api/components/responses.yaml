@@ -1,0 +1,75 @@
+BadRequest:
+  description: >
+    The request is malformed or fails validation. See the operation
+    description for which `type` values it can raise.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+Unauthorized:
+  description: >
+    No credentials were supplied, or the supplied credentials are not valid.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+Forbidden:
+  description: >
+    The caller is authenticated but their role does not permit this
+    operation. The resource's existence is not a secret.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+NotFound:
+  description: >
+    The resource does not exist, or it exists and belongs to another user.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+Conflict:
+  description: >
+    The request is well-formed and permitted, but conflicts with current
+    state. See the operation description for which `type` values it can
+    raise.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+PayloadTooLarge:
+  description: The uploaded file exceeds the declared size limit.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+UnsupportedMediaType:
+  description: >
+    The uploaded file is not an accepted image type, or a JSON body was sent
+    where multipart was expected.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+TooManyRequests:
+  description: The caller has exceeded the rate limit for this operation.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+
+InternalServerError:
+  description: >
+    Unhandled server error. `detail` never leaks a stack trace or other
+    internals.
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem

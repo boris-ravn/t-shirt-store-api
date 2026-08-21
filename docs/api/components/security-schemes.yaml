@@ -1,0 +1,8 @@
+bearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: >
+    Access token issued by POST /v1/auth/sign-in, /v1/auth/sign-up or
+    /v1/auth/refresh. Operations that do not require it declare
+    `security: []` explicitly.

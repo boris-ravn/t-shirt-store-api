@@ -1,0 +1,42 @@
+openapi: 3.1.0
+
+info:
+  title: T-Shirt Store API
+  version: 1.0.0
+  description: >
+    REST API for a T-shirt store: catalog with variants, cart, orders with a
+    status lifecycle, Stripe payments in two flavours, and a queue-backed
+    stock notification. See docs/api/CONVENTIONS.md for the rules this
+    contract follows and docs/database/README.md for the data model behind
+    it.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+    description: Sign up / in / out, refresh tokens, forgot and reset password.
+  - name: users
+    description: The authenticated caller's own profile.
+  - name: categories
+    description: Product categories.
+  - name: products
+    description: Products and their images.
+  - name: skus
+    description: Product variants (size, color, price, stock).
+  - name: likes
+    description: Client product likes, feeding the stock notification set.
+  - name: cart
+    description: The caller's own cart and its items.
+  - name: orders
+    description: Orders, their status lifecycle, and status history.
+  - name: payments
+    description: Stripe payment intents, payment-link checkout, and webhooks.
+  - name: promo-codes
+    description: Promo code management and validation.
+
+paths: {}

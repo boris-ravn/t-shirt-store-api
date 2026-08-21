@@ -1,0 +1,66 @@
+CartItem:
+  type: object
+  description: >
+    Every price here is read live from the SKU, not snapshotted — a cart's
+    subtotal can legitimately change between two reads.
+  properties:
+    id:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+    lineTotal:
+      $ref: ./common.yaml#/Money
+    availableQuantity:
+      type: integer
+      minimum: 0
+      description: From the line's SKU. Lets a client flag a line as unpurchasable before checkout fails.
+    sku:
+      $ref: ./catalog.yaml#/Sku
+    product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        imageUrl:
+          oneOf:
+            - type: string
+              format: uri
+            - type: 'null'
+      required:
+        - id
+        - name
+        - imageUrl
+  required:
+    - id
+    - quantity
+    - lineTotal
+    - availableQuantity
+    - sku
+    - product
+
+Cart:
+  type: object
+  description: Created on first read if the caller has none. `items` is a plain array, not a paginated collection.
+  properties:
+    id:
+      type: string
+      format: uuid
+    items:
+      type: array
+      items:
+        $ref: '#/CartItem'
+    subtotal:
+      $ref: ./common.yaml#/Money
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - items
+    - subtotal
+    - updatedAt

@@ -1,0 +1,92 @@
+AuthSession:
+  type: object
+  properties:
+    accessToken:
+      type: string
+    refreshToken:
+      type: string
+    expiresIn:
+      type: integer
+      description: Seconds until `accessToken` expires.
+    user:
+      $ref: ./user.yaml#/User
+  required:
+    - accessToken
+    - refreshToken
+    - expiresIn
+    - user
+
+SignUpRequest:
+  type: object
+  description: '`role` is deliberately absent — it is never accepted from a request body.'
+  properties:
+    email:
+      type: string
+      format: email
+    password:
+      type: string
+      minLength: 8
+    firstName:
+      type: string
+    lastName:
+      type: string
+  required:
+    - email
+    - password
+    - firstName
+    - lastName
+  additionalProperties: false
+
+SignInRequest:
+  type: object
+  properties:
+    email:
+      type: string
+      format: email
+    password:
+      type: string
+  required:
+    - email
+    - password
+  additionalProperties: false
+
+RefreshTokensRequest:
+  type: object
+  properties:
+    refreshToken:
+      type: string
+  required:
+    - refreshToken
+  additionalProperties: false
+
+SignOutRequest:
+  type: object
+  properties:
+    refreshToken:
+      type: string
+  required:
+    - refreshToken
+  additionalProperties: false
+
+RequestPasswordResetRequest:
+  type: object
+  properties:
+    email:
+      type: string
+      format: email
+  required:
+    - email
+  additionalProperties: false
+
+ResetPasswordRequest:
+  type: object
+  properties:
+    token:
+      type: string
+    password:
+      type: string
+      minLength: 8
+  required:
+    - token
+    - password
+  additionalProperties: false

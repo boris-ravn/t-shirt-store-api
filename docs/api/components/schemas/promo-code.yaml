@@ -1,0 +1,119 @@
+PercentageDiscount:
+  type: object
+  properties:
+    type:
+      type: string
+      enum:
+        - percentage
+    percent:
+      type: integer
+      minimum: 1
+      maximum: 100
+  required:
+    - type
+    - percent
+  additionalProperties: false
+
+FixedAmountDiscount:
+  type: object
+  properties:
+    type:
+      type: string
+      enum:
+        - fixedAmount
+    amount:
+      $ref: ./common.yaml#/Money
+  required:
+    - type
+    - amount
+  additionalProperties: false
+
+Discount:
+  description: >
+    `promo_codes.discount_value` is one integer meaning either whole percent
+    or minor units depending on the sibling `discount_type` column; this
+    discriminated union makes that unit unambiguous without a sibling field.
+  oneOf:
+    - $ref: '#/PercentageDiscount'
+    - $ref: '#/FixedAmountDiscount'
+  discriminator:
+    propertyName: type
+    mapping:
+      percentage: '#/PercentageDiscount'
+      fixedAmount: '#/FixedAmountDiscount'
+
+PromoCode:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    code:
+      type: string
+      description: Normalised to uppercase on write.
+    discount:
+      $ref: '#/Discount'
+    minPurchaseAmount:
+      oneOf:
+        - $ref: ./common.yaml#/Money
+        - type: 'null'
+      description: 'Null means no minimum.'
+    expiresAt:
+      type: string
+      format: date-time
+    usageLimit:
+      type: integer
+      minimum: 1
+    timesRedeemed:
+      type: integer
+      minimum: 0
+    isActive:
+      type: boolean
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - code
+    - discount
+    - minPurchaseAmount
+    - expiresAt
+    - usageLimit
+    - timesRedeemed
+    - isActive
+    - createdAt
+    - updatedAt
+
+PromoCodeValidation:
+  type: object
+  properties:
+    valid:
+      type: boolean
+    reason:
+      description: Populated, naming the failed rule, exactly when `valid` is false.
+      oneOf:
+        - type: string
+          enum:
+            - invalid
+            - expired
+            - exhausted
+            - minimum-not-met
+        - type: 'null'
+    discount:
+      description: The computed discount amount. Null exactly when `valid` is false.
+      oneOf:
+        - $ref: ./common.yaml#/Money
+        - type: 'null'
+    subtotal:
+      $ref: ./common.yaml#/Money
+    total:
+      $ref: ./common.yaml#/Money
+  required:
+    - valid
+    - reason
+    - discount
+    - subtotal
+    - total

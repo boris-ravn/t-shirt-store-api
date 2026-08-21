@@ -1,0 +1,29 @@
+PaymentIntentSession:
+  type: object
+  properties:
+    paymentId:
+      type: string
+      format: uuid
+    clientSecret:
+      type: string
+    amount:
+      $ref: ./common.yaml#/Money
+  required:
+    - paymentId
+    - clientSecret
+    - amount
+
+PaymentLinkCheckout:
+  type: object
+  description: >
+    A 201 here is not a promise of availability — Payment Links never
+    reserve stock ahead of the charge.
+  properties:
+    order:
+      $ref: ./order.yaml#/Order
+    checkoutUrl:
+      type: string
+      format: uri
+  required:
+    - order
+    - checkoutUrl

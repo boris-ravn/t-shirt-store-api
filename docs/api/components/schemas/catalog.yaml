@@ -1,0 +1,155 @@
+Category:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    slug:
+      type: string
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - name
+    - slug
+    - createdAt
+    - updatedAt
+
+ProductImage:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    url:
+      type: string
+      format: uri
+      description: Built at response time from the stored object key, not stored as a URL.
+    position:
+      type: integer
+      minimum: 0
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - url
+    - position
+    - createdAt
+
+ProductStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+
+Sku:
+  type: object
+  description: Client-facing SKU. Raw stock counters are not exposed — see SkuAdmin.
+  properties:
+    id:
+      type: string
+      format: uuid
+    size:
+      type: string
+    color:
+      type: string
+    price:
+      $ref: ./common.yaml#/Money
+    availableQuantity:
+      type: integer
+      minimum: 0
+      description: Derived as `stock - reservedStock`. No column behind it.
+  required:
+    - id
+    - size
+    - color
+    - price
+    - availableQuantity
+
+SkuAdmin:
+  allOf:
+    - $ref: '#/Sku'
+    - type: object
+      properties:
+        skuCode:
+          type: string
+        stock:
+          type: integer
+          minimum: 0
+          description: Units physically held, decremented on successful payment.
+        reservedStock:
+          type: integer
+          minimum: 0
+          description: Held by pending cart orders.
+        deletedAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+      required:
+        - skuCode
+        - stock
+        - reservedStock
+        - deletedAt
+
+Product:
+  type: object
+  description: Client-facing product. Always active and not soft-deleted.
+  properties:
+    id:
+      type: string
+      format: uuid
+    categoryId:
+      type: string
+      format: uuid
+    name:
+      type: string
+    description:
+      oneOf:
+        - type: string
+        - type: 'null'
+    images:
+      type: array
+      items:
+        $ref: '#/ProductImage'
+    skus:
+      type: array
+      items:
+        $ref: '#/Sku'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - categoryId
+    - name
+    - description
+    - images
+    - skus
+    - createdAt
+    - updatedAt
+
+ProductAdmin:
+  allOf:
+    - $ref: '#/Product'
+    - type: object
+      properties:
+        status:
+          $ref: '#/ProductStatus'
+        skus:
+          type: array
+          items:
+            $ref: '#/SkuAdmin'
+      required:
+        - status
+        - skus

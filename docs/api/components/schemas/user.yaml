@@ -1,0 +1,39 @@
+UserRole:
+  type: string
+  enum:
+    - manager
+    - client
+    - delivery_person
+
+User:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    email:
+      type: string
+      format: email
+    firstName:
+      type: string
+    lastName:
+      type: string
+    role:
+      $ref: '#/UserRole'
+    passwordChangedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+      description: 'Null means the password has never been changed since account creation.'
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - email
+    - firstName
+    - lastName
+    - role
+    - passwordChangedAt
+    - createdAt

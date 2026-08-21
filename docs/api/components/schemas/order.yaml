@@ -1,0 +1,192 @@
+OrderStatus:
+  type: string
+  enum:
+    - pending
+    - paid
+    - processing
+    - shipped
+    - delivered
+    - cancelled
+
+OrderItem:
+  type: object
+  description: A snapshot at purchase time — never re-resolved through products or skus.
+  properties:
+    id:
+      type: string
+      format: uuid
+    productId:
+      type: string
+      format: uuid
+    skuId:
+      type: string
+      format: uuid
+    productName:
+      type: string
+    size:
+      type: string
+    color:
+      type: string
+    quantity:
+      type: integer
+      minimum: 1
+    unitPrice:
+      $ref: ./common.yaml#/Money
+  required:
+    - id
+    - productId
+    - skuId
+    - productName
+    - size
+    - color
+    - quantity
+    - unitPrice
+
+OrderShippingDetails:
+  type: object
+  description: Snapshotted from the successful-payment webhook. No row exists until then.
+  properties:
+    recipientName:
+      type: string
+    phone:
+      oneOf:
+        - type: string
+        - type: 'null'
+    line1:
+      type: string
+    line2:
+      oneOf:
+        - type: string
+        - type: 'null'
+    city:
+      type: string
+    state:
+      oneOf:
+        - type: string
+        - type: 'null'
+    postalCode:
+      type: string
+    country:
+      type: string
+      pattern: ^[A-Z]{2}$
+      description: ISO 3166-1 alpha-2.
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - recipientName
+    - phone
+    - line1
+    - line2
+    - city
+    - state
+    - postalCode
+    - country
+    - createdAt
+
+OrderStatusChange:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    status:
+      $ref: '#/OrderStatus'
+    changedBy:
+      oneOf:
+        - type: string
+          format: uuid
+        - type: 'null'
+      description: Null when the transition was triggered by a webhook rather than a person.
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - status
+    - changedBy
+    - createdAt
+
+Order:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    status:
+      $ref: '#/OrderStatus'
+    items:
+      type: array
+      items:
+        $ref: '#/OrderItem'
+    subtotal:
+      $ref: ./common.yaml#/Money
+    discountAmount:
+      $ref: ./common.yaml#/Money
+    total:
+      $ref: ./common.yaml#/Money
+    shippingDetails:
+      oneOf:
+        - $ref: '#/OrderShippingDetails'
+        - type: 'null'
+      description: Null on an unpaid order.
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - status
+    - items
+    - subtotal
+    - discountAmount
+    - total
+    - shippingDetails
+    - createdAt
+    - updatedAt
+
+OrderAdmin:
+  allOf:
+    - $ref: '#/Order'
+    - type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            firstName:
+              type: string
+            lastName:
+              type: string
+          required:
+            - id
+            - email
+            - firstName
+            - lastName
+        promoCode:
+          description: >
+            Joined through `promoCodeId`, correct only because `code` is
+            treated as immutable after creation.
+          oneOf:
+            - type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+              required:
+                - id
+                - code
+              additionalProperties: false
+            - type: 'null'
+      required:
+        - user
+        - promoCode

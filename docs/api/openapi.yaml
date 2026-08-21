@@ -9,6 +9,9 @@ info:
     stock notification. See docs/api/CONVENTIONS.md for the rules this
     contract follows and docs/database/README.md for the data model behind
     it.
+  contact:
+    name: T-Shirt Store API Support
+    email: api-support@tshirt-store.example
 
 servers:
   - url: http://localhost:3000

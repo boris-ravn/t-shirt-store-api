@@ -42,7 +42,7 @@ How the document gets written. Working practices rather than trade-off decisions
 
 **Split across files rather than growing one monolith.** External `$ref`s keep pull requests reviewable. Accepted cost: the document must be bundled before tools that do not resolve external references will accept it.
 
-**Lint in CI with Spectral.** The linter is the safety net that decorators plus TypeScript used to provide: every operation has a summary, every 4xx carries the error schema, every operation has an `operationId`. A convention that is not enforced is not a convention.
+**Lint with both Spectral and Redocly — `npm run lint:openapi` runs both.** Spectral is the safety net for this project's house rules: every operation has a summary, every 4xx carries the error schema, every operation has an `operationId`. But Spectral's `oas3-schema` rule is disabled (`decisions.md`, "Spectral's `oas3-schema` rule disabled") because it false-positives on this contract's modular `$ref` structure — which means Spectral alone no longer validates the document against the OpenAPI schema itself. `redocly lint` is what still catches that: a schema that doesn't validate, an example that doesn't conform, a `oneOf`/`anyOf` that can never match. Running only `spectral lint` and seeing zero errors is not the same claim it used to be. A convention that is not enforced is not a convention — that is why both are one script, not two commands someone has to remember.
 
 **Change the contract additively, or version it — never quietly.** Adding an optional field is safe. Renaming a response field, tightening a type, adding a required request field and changing a status code are all breaks, however much they look like improvements. Deprecate and remove on a schedule, or cut a new version.
 

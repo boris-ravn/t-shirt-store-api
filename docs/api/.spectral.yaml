@@ -134,11 +134,9 @@ rules:
           match: "^date-time$"
 
   schema-has-example:
-    description: >
-      Every object schema carries an example. Warn until Phase 4 fills examples in;
-      promote to error once that phase closes out.
+    description: Every object schema carries an example.
     message: "Schema must carry an example."
-    severity: warn
+    severity: error
     given: "$..[?(@property === 'properties')]^"
     then:
       field: example

@@ -24,6 +24,17 @@
               required:
                 - data
                 - meta
+              example:
+                data:
+                  - id: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+                    name: T-Shirts
+                    slug: t-shirts
+                    createdAt: "2026-01-10T09:00:00Z"
+                    updatedAt: "2026-01-10T09:00:00Z"
+                meta:
+                  total: 4
+                  limit: 20
+                  offset: 0
       "400":
         $ref: ../components/responses.yaml#/BadRequest
       "500":

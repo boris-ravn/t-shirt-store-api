@@ -3,9 +3,10 @@
     operationId: createPaymentIntent
     summary: Create a Stripe payment intent for an order
     description: >
-      Cart-checkout flow. Raises 409 `order-not-payable` (with `status`)
-      unless the order is `pending` with no already-succeeded payment.
-      Callable only by the order's own client.
+      Cart-checkout flow. Raises 409 `order-not-payable` (with an
+      `orderStatus` extension member — named to avoid colliding with
+      `Problem`'s own `status`) unless the order is `pending` with no
+      already-succeeded payment. Callable only by the order's own client.
     tags: [payments]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam

@@ -60,6 +60,26 @@
               required:
                 - data
                 - meta
+              example:
+                data:
+                  - id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                    code: WELCOME15
+                    discount:
+                      type: percentage
+                      percent: 15
+                    minPurchaseAmount:
+                      amount: 2000
+                      currency: USD
+                    expiresAt: "2026-12-31T23:59:59Z"
+                    usageLimit: 500
+                    timesRedeemed: 37
+                    isActive: true
+                    createdAt: "2026-01-02T08:00:00Z"
+                    updatedAt: "2026-01-02T08:00:00Z"
+                meta:
+                  total: 1
+                  limit: 20
+                  offset: 0
       "400":
         $ref: ../components/responses.yaml#/BadRequest
       "401":

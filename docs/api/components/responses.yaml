@@ -6,6 +6,42 @@ BadRequest:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        validation-error:
+          summary: A request body or query parameter failed validation.
+          value:
+            type: https://api.tshirt-store.example/problems/validation-error
+            title: Validation failed
+            status: 400
+            detail: One or more fields failed validation.
+            instance: /v1/cart/items
+            errors:
+              - field: quantity
+                message: quantity must not be less than 1
+        malformed-request:
+          summary: The request body could not be parsed as JSON.
+          value:
+            type: https://api.tshirt-store.example/problems/malformed-request
+            title: Malformed request body
+            status: 400
+            detail: The request body is not valid JSON.
+            instance: /v1/cart/items
+        invalid-reset-token:
+          summary: The password-reset token is unknown, expired, or already used.
+          value:
+            type: https://api.tshirt-store.example/problems/invalid-reset-token
+            title: Invalid reset token
+            status: 400
+            detail: This password reset token is invalid or has expired.
+            instance: /v1/auth/reset-password
+        invalid-webhook-signature:
+          summary: The Stripe-Signature header could not be verified.
+          value:
+            type: https://api.tshirt-store.example/problems/invalid-webhook-signature
+            title: Invalid webhook signature
+            status: 400
+            detail: The Stripe-Signature header does not match the request body.
+            instance: /v1/webhooks/stripe
 
 Unauthorized:
   description: >
@@ -14,6 +50,31 @@ Unauthorized:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        unauthenticated:
+          summary: The access token is missing, expired, or malformed.
+          value:
+            type: https://api.tshirt-store.example/problems/unauthenticated
+            title: Authentication required
+            status: 401
+            detail: The access token is missing or has expired.
+            instance: /v1/users/me
+        invalid-credentials:
+          summary: The email or password did not match — one message for both, to avoid enumeration.
+          value:
+            type: https://api.tshirt-store.example/problems/invalid-credentials
+            title: Invalid credentials
+            status: 401
+            detail: Email or password is incorrect.
+            instance: /v1/auth/sign-in
+        invalid-refresh-token:
+          summary: The refresh token is unknown, expired, or already revoked.
+          value:
+            type: https://api.tshirt-store.example/problems/invalid-refresh-token
+            title: Invalid refresh token
+            status: 401
+            detail: This refresh token is invalid or has been revoked.
+            instance: /v1/auth/refresh
 
 Forbidden:
   description: >
@@ -23,6 +84,16 @@ Forbidden:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        insufficient-permissions:
+          summary: The caller's role does not permit this operation.
+          value:
+            type: https://api.tshirt-store.example/problems/insufficient-permissions
+            title: Insufficient permissions
+            status: 403
+            detail: This operation requires the manager role.
+            instance: /v1/products
+            requiredRole: manager
 
 NotFound:
   description: >
@@ -31,6 +102,16 @@ NotFound:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        not-found:
+          summary: The resource does not exist, or belongs to another user.
+          value:
+            type: https://api.tshirt-store.example/problems/not-found
+            title: Resource not found
+            status: 404
+            detail: No order was found with this id.
+            instance: /v1/orders/6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+            resource: order
 
 Conflict:
   description: >
@@ -41,6 +122,138 @@ Conflict:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        email-already-registered:
+          summary: signUp — the email is already registered.
+          value:
+            type: https://api.tshirt-store.example/problems/email-already-registered
+            title: Email already registered
+            status: 409
+            detail: An account with this email already exists.
+            instance: /v1/auth/sign-up
+        category-name-taken:
+          summary: createCategory, updateCategory — name or slug already in use.
+          value:
+            type: https://api.tshirt-store.example/problems/category-name-taken
+            title: Category name or slug already in use
+            status: 409
+            detail: A category with this name or slug already exists.
+            instance: /v1/categories
+        category-not-empty:
+          summary: deleteCategory — products still reference this category.
+          value:
+            type: https://api.tshirt-store.example/problems/category-not-empty
+            title: Category is not empty
+            status: 409
+            detail: This category still has products assigned to it.
+            instance: /v1/categories/1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+            productCount: 12
+        duplicate-sku:
+          summary: createSku, updateSku — skuCode or (size, color) already in use.
+          value:
+            type: https://api.tshirt-store.example/problems/duplicate-sku
+            title: Duplicate SKU
+            status: 409
+            detail: A SKU with this code already exists for this product.
+            instance: /v1/products/8f14e45f-ceea-467e-bd97-37a58c1a5e4b/skus
+            conflictingField: skuCode
+        sku-reserved:
+          summary: deleteSku — pending orders still hold units of this SKU.
+          value:
+            type: https://api.tshirt-store.example/problems/sku-reserved
+            title: SKU has reserved stock
+            status: 409
+            detail: This SKU has units reserved by pending orders and cannot be deleted.
+            instance: /v1/skus/3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+            reservedQuantity: 8
+        cart-empty:
+          summary: createOrder, validatePromoCode — the caller's cart has no items.
+          value:
+            type: https://api.tshirt-store.example/problems/cart-empty
+            title: Cart is empty
+            status: 409
+            detail: The cart has no items to check out.
+            instance: /v1/orders
+        insufficient-stock:
+          summary: createOrder only — a line's quantity exceeds what's available.
+          value:
+            type: https://api.tshirt-store.example/problems/insufficient-stock
+            title: Insufficient stock
+            status: 409
+            detail: Only 1 unit of this SKU is available.
+            instance: /v1/orders
+            skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+            requested: 2
+            available: 1
+        promo-code-invalid:
+          summary: createOrder, validatePromoCode — the code does not exist or is inactive.
+          value:
+            type: https://api.tshirt-store.example/problems/promo-code-invalid
+            title: Invalid promo code
+            status: 409
+            detail: This promo code does not exist or is not active.
+            instance: /v1/orders
+        promo-code-expired:
+          summary: createOrder, validatePromoCode — the code's expiry date has passed.
+          value:
+            type: https://api.tshirt-store.example/problems/promo-code-expired
+            title: Promo code expired
+            status: 409
+            detail: This promo code expired on the given date.
+            instance: /v1/orders
+            expiresAt: "2026-01-01T00:00:00Z"
+        promo-code-exhausted:
+          summary: createOrder, validatePromoCode — the usage limit has been reached.
+          value:
+            type: https://api.tshirt-store.example/problems/promo-code-exhausted
+            title: Promo code exhausted
+            status: 409
+            detail: This promo code has reached its usage limit.
+            instance: /v1/orders
+            usageLimit: 500
+        promo-minimum-not-met:
+          summary: createOrder, validatePromoCode — the cart subtotal is below the code's minimum.
+          value:
+            type: https://api.tshirt-store.example/problems/promo-minimum-not-met
+            title: Minimum purchase not met
+            status: 409
+            detail: This promo code requires a higher subtotal.
+            instance: /v1/orders
+            minPurchaseAmount:
+              amount: 2000
+              currency: USD
+            subtotal:
+              amount: 1500
+              currency: USD
+        promo-code-taken:
+          summary: createPromoCode — the code is already in use.
+          value:
+            type: https://api.tshirt-store.example/problems/promo-code-taken
+            title: Promo code already in use
+            status: 409
+            detail: A promo code with this code already exists.
+            instance: /v1/promo-codes
+        invalid-status-transition:
+          summary: cancelOrder, processOrder, shipOrder, deliverOrder — the order is not in a status this transition allows.
+          value:
+            type: https://api.tshirt-store.example/problems/invalid-status-transition
+            title: Invalid order status transition
+            status: 409
+            detail: An order can only be shipped from processing.
+            instance: /v1/orders/6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c/ship
+            from: pending
+            to: shipped
+            allowed:
+              - processing
+        order-not-payable:
+          summary: createPaymentIntent — the order is not pending, or already has a succeeded payment.
+          value:
+            type: https://api.tshirt-store.example/problems/order-not-payable
+            title: Order is not payable
+            status: 409
+            detail: This order already has a succeeded payment.
+            instance: /v1/orders/6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c/payment-intent
+            orderStatus: paid
 
 PayloadTooLarge:
   description: The uploaded file exceeds the declared size limit.
@@ -48,6 +261,17 @@ PayloadTooLarge:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        image-too-large:
+          summary: uploadProductImage only.
+          value:
+            type: https://api.tshirt-store.example/problems/image-too-large
+            title: Image too large
+            status: 413
+            detail: The uploaded file exceeds the 5 MiB limit.
+            instance: /v1/products/8f14e45f-ceea-467e-bd97-37a58c1a5e4b/images
+            maxBytes: 5242880
+            receivedBytes: 7340032
 
 UnsupportedMediaType:
   description: >
@@ -57,6 +281,19 @@ UnsupportedMediaType:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        unsupported-image-type:
+          summary: uploadProductImage only.
+          value:
+            type: https://api.tshirt-store.example/problems/unsupported-image-type
+            title: Unsupported image type
+            status: 415
+            detail: Only image/jpeg, image/png and image/webp are accepted.
+            instance: /v1/products/8f14e45f-ceea-467e-bd97-37a58c1a5e4b/images
+            accepted:
+              - image/jpeg
+              - image/png
+              - image/webp
 
 TooManyRequests:
   description: The caller has exceeded the rate limit for this operation.
@@ -64,6 +301,16 @@ TooManyRequests:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        rate-limit-exceeded:
+          summary: Declared on the auth operations only.
+          value:
+            type: https://api.tshirt-store.example/problems/rate-limit-exceeded
+            title: Too many requests
+            status: 429
+            detail: Too many sign-in attempts. Try again later.
+            instance: /v1/auth/sign-in
+            retryAfterSeconds: 60
 
 InternalServerError:
   description: >
@@ -73,3 +320,12 @@ InternalServerError:
     application/problem+json:
       schema:
         $ref: ./schemas/common.yaml#/Problem
+      examples:
+        internal-error:
+          summary: Declared on every operation; detail is always generic.
+          value:
+            type: https://api.tshirt-store.example/problems/internal-error
+            title: Internal server error
+            status: 500
+            detail: An unexpected error occurred.
+            instance: /v1/orders

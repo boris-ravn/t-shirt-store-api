@@ -4,6 +4,7 @@ UserRole:
     - manager
     - client
     - delivery_person
+  example: client
 
 User:
   type: object
@@ -37,6 +38,14 @@ User:
     - role
     - passwordChangedAt
     - createdAt
+  example:
+    id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+    email: jane.doe@example.com
+    firstName: Jane
+    lastName: Doe
+    role: client
+    passwordChangedAt: null
+    createdAt: "2026-01-05T14:30:00Z"
 
 UpdateCurrentUserRequest:
   type: object
@@ -50,3 +59,6 @@ UpdateCurrentUserRequest:
     - firstName
     - lastName
   additionalProperties: false
+  example:
+    firstName: Jane
+    lastName: Smith

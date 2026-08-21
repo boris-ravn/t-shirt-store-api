@@ -35,6 +35,10 @@ CartItem:
         - id
         - name
         - imageUrl
+      example:
+        id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+        name: Classic Tee
+        imageUrl: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
   required:
     - id
     - quantity
@@ -42,6 +46,25 @@ CartItem:
     - availableQuantity
     - sku
     - product
+  example:
+    id: 5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f
+    quantity: 2
+    lineTotal:
+      amount: 3998
+      currency: USD
+    availableQuantity: 42
+    sku:
+      id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+      size: M
+      color: black
+      price:
+        amount: 1999
+        currency: USD
+      availableQuantity: 42
+    product:
+      id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+      name: Classic Tee
+      imageUrl: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
 
 AddCartItemRequest:
   type: object
@@ -59,6 +82,9 @@ AddCartItemRequest:
     - skuId
     - quantity
   additionalProperties: false
+  example:
+    skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    quantity: 2
 
 UpdateCartItemRequest:
   type: object
@@ -70,6 +96,8 @@ UpdateCartItemRequest:
   required:
     - quantity
   additionalProperties: false
+  example:
+    quantity: 3
 
 Cart:
   type: object
@@ -92,3 +120,28 @@ Cart:
     - items
     - subtotal
     - updatedAt
+  example:
+    id: 4c5d6e7f-8a9b-4c0d-8e1f-2a3b4c5d6e7f
+    items:
+      - id: 5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f
+        quantity: 2
+        lineTotal:
+          amount: 3998
+          currency: USD
+        availableQuantity: 42
+        sku:
+          id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+          size: M
+          color: black
+          price:
+            amount: 1999
+            currency: USD
+          availableQuantity: 42
+        product:
+          id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+          name: Classic Tee
+          imageUrl: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+    subtotal:
+      amount: 3998
+      currency: USD
+    updatedAt: "2026-01-12T10:15:00Z"

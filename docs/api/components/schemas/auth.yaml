@@ -15,6 +15,18 @@ AuthSession:
     - refreshToken
     - expiresIn
     - user
+  example:
+    accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyZjRiNmM4ZCJ9.dQw4w9WgXcQ
+    refreshToken: 8f14e45fceea467ebd9737a58c1a5e4b
+    expiresIn: 3600
+    user:
+      id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+      email: jane.doe@example.com
+      firstName: Jane
+      lastName: Doe
+      role: client
+      passwordChangedAt: null
+      createdAt: "2026-01-05T14:30:00Z"
 
 SignUpRequest:
   type: object
@@ -36,6 +48,11 @@ SignUpRequest:
     - firstName
     - lastName
   additionalProperties: false
+  example:
+    email: jane.doe@example.com
+    password: correct-horse-battery-staple
+    firstName: Jane
+    lastName: Doe
 
 SignInRequest:
   type: object
@@ -49,6 +66,9 @@ SignInRequest:
     - email
     - password
   additionalProperties: false
+  example:
+    email: jane.doe@example.com
+    password: correct-horse-battery-staple
 
 RefreshTokensRequest:
   type: object
@@ -58,6 +78,8 @@ RefreshTokensRequest:
   required:
     - refreshToken
   additionalProperties: false
+  example:
+    refreshToken: 8f14e45fceea467ebd9737a58c1a5e4b
 
 SignOutRequest:
   type: object
@@ -67,6 +89,8 @@ SignOutRequest:
   required:
     - refreshToken
   additionalProperties: false
+  example:
+    refreshToken: 8f14e45fceea467ebd9737a58c1a5e4b
 
 RequestPasswordResetRequest:
   type: object
@@ -77,6 +101,8 @@ RequestPasswordResetRequest:
   required:
     - email
   additionalProperties: false
+  example:
+    email: jane.doe@example.com
 
 ResetPasswordRequest:
   type: object
@@ -90,3 +116,6 @@ ResetPasswordRequest:
     - token
     - password
   additionalProperties: false
+  example:
+    token: 3b1f2e8a6c2d4e2a9f3b1a2b3c4d5e6f
+    password: a-new-correct-horse-battery-staple

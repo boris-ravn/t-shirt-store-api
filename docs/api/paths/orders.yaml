@@ -114,6 +114,37 @@
                   required:
                     - data
                     - meta
+                  example:
+                    data:
+                      - id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+                        status: paid
+                        items:
+                          - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                            productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+                            skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+                            productName: Classic Tee
+                            size: M
+                            color: black
+                            quantity: 2
+                            unitPrice:
+                              amount: 1999
+                              currency: USD
+                        subtotal:
+                          amount: 3998
+                          currency: USD
+                        discountAmount:
+                          amount: 300
+                          currency: USD
+                        total:
+                          amount: 3698
+                          currency: USD
+                        shippingDetails: null
+                        createdAt: "2026-01-12T10:45:00Z"
+                        updatedAt: "2026-01-12T11:00:00Z"
+                    meta:
+                      total: 1
+                      limit: 20
+                      offset: 0
                 - type: object
                   properties:
                     data:
@@ -125,6 +156,45 @@
                   required:
                     - data
                     - meta
+                  example:
+                    data:
+                      - id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+                        status: paid
+                        items:
+                          - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                            productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+                            skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+                            productName: Classic Tee
+                            size: M
+                            color: black
+                            quantity: 2
+                            unitPrice:
+                              amount: 1999
+                              currency: USD
+                        subtotal:
+                          amount: 3998
+                          currency: USD
+                        discountAmount:
+                          amount: 300
+                          currency: USD
+                        total:
+                          amount: 3698
+                          currency: USD
+                        shippingDetails: null
+                        createdAt: "2026-01-12T10:45:00Z"
+                        updatedAt: "2026-01-12T11:00:00Z"
+                        user:
+                          id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+                          email: jane.doe@example.com
+                          firstName: Jane
+                          lastName: Doe
+                        promoCode:
+                          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                          code: WELCOME15
+                    meta:
+                      total: 1
+                      limit: 20
+                      offset: 0
       "400":
         $ref: ../components/responses.yaml#/BadRequest
       "401":
@@ -299,6 +369,20 @@
               required:
                 - data
                 - meta
+              example:
+                data:
+                  - id: 9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b
+                    status: pending
+                    changedBy: null
+                    createdAt: "2026-01-12T10:45:00Z"
+                  - id: a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                    status: paid
+                    changedBy: null
+                    createdAt: "2026-01-12T11:00:00Z"
+                meta:
+                  total: 2
+                  limit: 20
+                  offset: 0
       "400":
         $ref: ../components/responses.yaml#/BadRequest
       "401":

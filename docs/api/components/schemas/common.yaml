@@ -15,6 +15,9 @@ Money:
     - amount
     - currency
   additionalProperties: false
+  example:
+    amount: 1999
+    currency: USD
 
 PaginationMeta:
   type: object
@@ -37,6 +40,10 @@ PaginationMeta:
     - limit
     - offset
   additionalProperties: false
+  example:
+    total: 42
+    limit: 20
+    offset: 0
 
 ValidationErrorDetail:
   type: object
@@ -54,6 +61,9 @@ ValidationErrorDetail:
     - field
     - message
   additionalProperties: false
+  example:
+    field: items[0].quantity
+    message: quantity must not be less than 1
 
 Problem:
   type: object
@@ -80,8 +90,11 @@ Problem:
         such as a stack trace or a raw database error.
     instance:
       type: string
-      format: uri
-      description: The request path that failed.
+      format: uri-reference
+      description: >
+        The request path that failed, e.g. `/v1/cart/items`. RFC 9457 defines
+        this member as a URI *reference*, which — unlike `type`, a full URI —
+        permits a relative path with no scheme or host.
     errors:
       type: array
       description: >
@@ -93,7 +106,12 @@ Problem:
     - title
     - status
   additionalProperties: true
-  # Other problem types carry their own extension members (requiredRole,
-  # resource, expiresAt, ...) per the registry in openapi-plan.md §3.4 —
-  # additionalProperties stays true so each can be declared per-response
-  # without widening this base schema.
+  example:
+    type: https://api.tshirt-store.example/problems/validation-error
+    title: Validation failed
+    status: 400
+    detail: One or more fields failed validation.
+    instance: /v1/cart/items
+    errors:
+      - field: quantity
+        message: quantity must not be less than 1

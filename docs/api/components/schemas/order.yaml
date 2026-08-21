@@ -7,6 +7,7 @@ OrderStatus:
     - shipped
     - delivered
     - cancelled
+  example: paid
 
 CreateOrderRequest:
   type: object
@@ -15,6 +16,8 @@ CreateOrderRequest:
     promoCode:
       type: string
   additionalProperties: false
+  example:
+    promoCode: WELCOME15
 
 OrderItem:
   type: object
@@ -49,6 +52,17 @@ OrderItem:
     - color
     - quantity
     - unitPrice
+  example:
+    id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+    productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+    skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    productName: Classic Tee
+    size: M
+    color: black
+    quantity: 2
+    unitPrice:
+      amount: 1999
+      currency: USD
 
 OrderShippingDetails:
   type: object
@@ -91,6 +105,16 @@ OrderShippingDetails:
     - postalCode
     - country
     - createdAt
+  example:
+    recipientName: Jane Doe
+    phone: "+1-555-0100"
+    line1: 123 Main St
+    line2: null
+    city: Springfield
+    state: IL
+    postalCode: "62704"
+    country: US
+    createdAt: "2026-01-12T11:00:00Z"
 
 OrderStatusChange:
   type: object
@@ -114,6 +138,11 @@ OrderStatusChange:
     - status
     - changedBy
     - createdAt
+  example:
+    id: 9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b
+    status: paid
+    changedBy: null
+    createdAt: "2026-01-12T11:00:00Z"
 
 Order:
   type: object
@@ -154,6 +183,41 @@ Order:
     - shippingDetails
     - createdAt
     - updatedAt
+  example:
+    id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+    status: paid
+    items:
+      - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+        skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+        productName: Classic Tee
+        size: M
+        color: black
+        quantity: 2
+        unitPrice:
+          amount: 1999
+          currency: USD
+    subtotal:
+      amount: 3998
+      currency: USD
+    discountAmount:
+      amount: 300
+      currency: USD
+    total:
+      amount: 3698
+      currency: USD
+    shippingDetails:
+      recipientName: Jane Doe
+      phone: "+1-555-0100"
+      line1: 123 Main St
+      line2: null
+      city: Springfield
+      state: IL
+      postalCode: "62704"
+      country: US
+      createdAt: "2026-01-12T11:00:00Z"
+    createdAt: "2026-01-12T10:45:00Z"
+    updatedAt: "2026-01-12T11:00:00Z"
 
 OrderAdmin:
   allOf:
@@ -178,6 +242,11 @@ OrderAdmin:
             - email
             - firstName
             - lastName
+          example:
+            id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+            email: jane.doe@example.com
+            firstName: Jane
+            lastName: Doe
         promoCode:
           description: >
             Joined through `promoCodeId`, correct only because `code` is
@@ -194,7 +263,62 @@ OrderAdmin:
                 - id
                 - code
               additionalProperties: false
+              example:
+                id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                code: WELCOME15
             - type: 'null'
       required:
         - user
         - promoCode
+      example:
+        user:
+          id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+          email: jane.doe@example.com
+          firstName: Jane
+          lastName: Doe
+        promoCode:
+          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+          code: WELCOME15
+  example:
+    id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+    status: paid
+    items:
+      - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+        skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+        productName: Classic Tee
+        size: M
+        color: black
+        quantity: 2
+        unitPrice:
+          amount: 1999
+          currency: USD
+    subtotal:
+      amount: 3998
+      currency: USD
+    discountAmount:
+      amount: 300
+      currency: USD
+    total:
+      amount: 3698
+      currency: USD
+    shippingDetails:
+      recipientName: Jane Doe
+      phone: "+1-555-0100"
+      line1: 123 Main St
+      line2: null
+      city: Springfield
+      state: IL
+      postalCode: "62704"
+      country: US
+      createdAt: "2026-01-12T11:00:00Z"
+    createdAt: "2026-01-12T10:45:00Z"
+    updatedAt: "2026-01-12T11:00:00Z"
+    user:
+      id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+      email: jane.doe@example.com
+      firstName: Jane
+      lastName: Doe
+    promoCode:
+      id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+      code: WELCOME15

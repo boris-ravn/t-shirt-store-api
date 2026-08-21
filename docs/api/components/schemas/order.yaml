@@ -8,6 +8,14 @@ OrderStatus:
     - delivered
     - cancelled
 
+CreateOrderRequest:
+  type: object
+  description: Checks out the caller's own cart — there is no items field, since the order is built from it.
+  properties:
+    promoCode:
+      type: string
+  additionalProperties: false
+
 OrderItem:
   type: object
   description: A snapshot at purchase time — never re-resolved through products or skus.

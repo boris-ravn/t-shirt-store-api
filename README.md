@@ -33,9 +33,9 @@ Only the Nest scaffold is installed today. Everything below the framework row ar
 ```
 t-shirt-store-api/
 ├── docs/
-│   ├── api/            # OpenAPI contract (Week 2 design)
+│   ├── api/            # OpenAPI contract + its conventions (Week 2 design)
 │   ├── database/       # ERD in DBML + its rationale (Week 1 design)
-│   └── decisions.md    # running log of settled decisions
+│   └── decisions.md    # append-only log of settled decisions
 ├── src/                # application code
 ├── test/               # end-to-end specs
 └── CLAUDE.md           # project-scoped agent instructions

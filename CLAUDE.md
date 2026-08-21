@@ -11,11 +11,11 @@ The capstone of the RAVN backend module: a REST API for a T-shirt store. Catalog
 Two documents are the contract. Both outrank anything said in chat:
 
 - `docs/database/` — the ERD: `erd.dbml` for the schema, `README.md` for the reasoning behind it (Week 1)
-- `docs/api/` — the OpenAPI contract, from Week 2
+- `docs/api/` — the OpenAPI contract (Week 2), governed by `CONVENTIONS.md` in the same directory
 
 If the code and one of those disagree, that is a bug in one of them. Name which one you think is wrong and stop; do not silently pick a side.
 
-`docs/decisions.md` is the running log of settled decisions. Append to it, do not rewrite history in it.
+`docs/api/CONVENTIONS.md` holds the binding rules for the contract — casing, error body, pagination, money, security, versioning, format precision, and how the document is authored. Read it before adding a path or a schema. `docs/decisions.md` is append-only history explaining why things are the way they are; add to it, never rewrite it.
 
 ---
 

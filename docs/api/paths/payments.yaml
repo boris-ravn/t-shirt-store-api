@@ -1,0 +1,108 @@
+/v1/orders/{orderId}/payment-intent:
+  post:
+    operationId: createPaymentIntent
+    summary: Create a Stripe payment intent for an order
+    description: >
+      Cart-checkout flow. Raises 409 `order-not-payable` (with `status`)
+      unless the order is `pending` with no already-succeeded payment.
+      Callable only by the order's own client.
+    tags: [payments]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+    responses:
+      "201":
+        description: Payment intent created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/payment.yaml#/PaymentIntentSession
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/checkout/payment-link:
+  post:
+    operationId: createPaymentLinkCheckout
+    summary: Start a single-SKU payment-link checkout
+    description: >
+      Quick-purchase flow: creates a `pending` order first so its id can
+      ride as `client_reference_id` on the Stripe payment link, then
+      returns the order alongside the checkout URL. Reserves no stock — the
+      201 is not a promise of availability. `payment_links` rows are
+      created lazily by the system on first use of a SKU; there is no
+      manager endpoint over them.
+    tags: [payments]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/payment.yaml#/CreatePaymentLinkCheckoutRequest
+    responses:
+      "201":
+        description: Checkout started.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/payment.yaml#/PaymentLinkCheckout
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/webhooks/stripe:
+  post:
+    operationId: handleStripeWebhook
+    summary: Receive a Stripe webhook event
+    description: >
+      Not a consumer-facing operation — part of the contract with Stripe,
+      not something a client calls. Requires the raw request body:
+      signature verification runs over the exact bytes, so the body must
+      not be JSON-parsed before it reaches the handler. Answers 204 for any
+      verified event, even one that fails downstream processing — only an
+      unverifiable signature answers 400 — because a 4xx/5xx here makes
+      Stripe retry on its own schedule instead of ours; a failed event is
+      still stored and retried internally off `processedAt IS NULL`. Stripe
+      delivers at-least-once, so the handler is idempotent against replay
+      via `stripe_webhook_events.id` as primary key.
+    tags: [payments]
+    x-internal: true
+    security: []
+    parameters:
+      - name: Stripe-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            description: >
+              The Stripe event envelope. Deliberately not whitelisted —
+              this is a signature-verified external payload, not a
+              client-supplied DTO, and Stripe defines dozens of event
+              shapes.
+            additionalProperties: true
+    responses:
+      "204":
+        description: Event received (and, if the signature verified, stored for processing).
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

@@ -27,3 +27,17 @@ PaymentLinkCheckout:
   required:
     - order
     - checkoutUrl
+
+CreatePaymentLinkCheckoutRequest:
+  type: object
+  properties:
+    skuId:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+  required:
+    - skuId
+    - quantity
+  additionalProperties: false

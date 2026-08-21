@@ -1,0 +1,40 @@
+/v1/users/me:
+  get:
+    operationId: getCurrentUser
+    summary: Get the caller's own profile
+    tags: [users]
+    responses:
+      "200":
+        description: The caller's profile.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/user.yaml#/User
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  patch:
+    operationId: updateCurrentUser
+    summary: Update the caller's own profile
+    description: '`firstName` and `lastName` only — not `email`, `role`, or `password`.'
+    tags: [users]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/user.yaml#/UpdateCurrentUserRequest
+    responses:
+      "200":
+        description: Profile updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/user.yaml#/User
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

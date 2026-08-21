@@ -37,3 +37,16 @@ User:
     - role
     - passwordChangedAt
     - createdAt
+
+UpdateCurrentUserRequest:
+  type: object
+  description: '`email`, `role` and `password` are deliberately absent — none is updatable here.'
+  properties:
+    firstName:
+      type: string
+    lastName:
+      type: string
+  required:
+    - firstName
+    - lastName
+  additionalProperties: false

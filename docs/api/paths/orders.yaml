@@ -102,7 +102,7 @@
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - type: object
                   properties:
                     data:
@@ -218,7 +218,7 @@
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: ../components/schemas/order.yaml#/Order
                 - $ref: ../components/schemas/order.yaml#/OrderAdmin
       "401":
@@ -264,7 +264,11 @@
   post:
     operationId: processOrder
     summary: Advance an order from paid to processing
-    description: '`paid → processing`. Raises 409 `invalid-status-transition` (with `from`, `to`, `allowed`) from any other status. Manager only.'
+    description: >
+      `paid → processing`. Raises 409 `invalid-status-transition` (with
+      `from`, `to`, `allowed`) from any other status. Manager only — returns
+      `OrderAdmin`, since every caller who can reach this operation already
+      gets that view from `listOrders`/`getOrder`.
     tags: [orders]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam
@@ -274,7 +278,7 @@
         content:
           application/json:
             schema:
-              $ref: ../components/schemas/order.yaml#/Order
+              $ref: ../components/schemas/order.yaml#/OrderAdmin
       "401":
         $ref: ../components/responses.yaml#/Unauthorized
       "403":
@@ -290,7 +294,11 @@
   post:
     operationId: shipOrder
     summary: Advance an order from processing to shipped
-    description: '`processing → shipped`. Raises 409 `invalid-status-transition` (with `from`, `to`, `allowed`) from any other status. Manager only.'
+    description: >
+      `processing → shipped`. Raises 409 `invalid-status-transition` (with
+      `from`, `to`, `allowed`) from any other status. Manager only — returns
+      `OrderAdmin`, since every caller who can reach this operation already
+      gets that view from `listOrders`/`getOrder`.
     tags: [orders]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam
@@ -300,7 +308,7 @@
         content:
           application/json:
             schema:
-              $ref: ../components/schemas/order.yaml#/Order
+              $ref: ../components/schemas/order.yaml#/OrderAdmin
       "401":
         $ref: ../components/responses.yaml#/Unauthorized
       "403":
@@ -346,7 +354,12 @@
   get:
     operationId: listOrderStatusHistory
     summary: List an order's status history
-    description: Paginated even though it is bounded — the envelope is the same on every collection endpoint, with no row-count exception.
+    description: >
+      Paginated even though it is bounded — the envelope is the same on
+      every collection endpoint, with no row-count exception. Ordered
+      ascending by `createdAt` (oldest first): `order_status_history.created_at`
+      uses `clock_timestamp()` specifically so this sequence is meaningful,
+      and a history reads naturally in the order it happened.
     tags: [orders]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam
@@ -354,7 +367,7 @@
       - $ref: ../components/parameters.yaml#/OffsetParam
     responses:
       "200":
-        description: A page of status changes, oldest or newest first per the service's default ordering.
+        description: A page of status changes, oldest first.
         content:
           application/json:
             schema:

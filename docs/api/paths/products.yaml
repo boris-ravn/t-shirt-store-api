@@ -57,7 +57,7 @@
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - type: object
                   properties:
                     data:
@@ -190,7 +190,7 @@
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: ../components/schemas/catalog.yaml#/Product
                 - $ref: ../components/schemas/catalog.yaml#/ProductAdmin
       "404":

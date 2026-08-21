@@ -21,6 +21,27 @@ Category:
     - createdAt
     - updatedAt
 
+CreateCategoryRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    slug:
+      type: string
+  required:
+    - name
+    - slug
+  additionalProperties: false
+
+UpdateCategoryRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    slug:
+      type: string
+  additionalProperties: false
+
 ProductImage:
   type: object
   properties:
@@ -42,6 +63,16 @@ ProductImage:
     - url
     - position
     - createdAt
+
+UpdateProductImageRequest:
+  type: object
+  properties:
+    position:
+      type: integer
+      minimum: 0
+  required:
+    - position
+  additionalProperties: false
 
 ProductStatus:
   type: string
@@ -99,6 +130,53 @@ SkuAdmin:
         - reservedStock
         - deletedAt
 
+CreateSkuRequest:
+  type: object
+  properties:
+    skuCode:
+      type: string
+    size:
+      type: string
+    color:
+      type: string
+    price:
+      $ref: ./common.yaml#/Money
+    stock:
+      type: integer
+      minimum: 0
+  required:
+    - skuCode
+    - size
+    - color
+    - price
+    - stock
+  additionalProperties: false
+
+UpdateSkuRequest:
+  type: object
+  description: '`stock` is deliberately absent — see `restockSku` for the only supported write to it.'
+  properties:
+    skuCode:
+      type: string
+    size:
+      type: string
+    color:
+      type: string
+    price:
+      $ref: ./common.yaml#/Money
+  additionalProperties: false
+
+RestockSkuRequest:
+  type: object
+  properties:
+    quantity:
+      type: integer
+      minimum: 1
+      description: A delta added to `stock`, not an absolute value.
+  required:
+    - quantity
+  additionalProperties: false
+
 Product:
   type: object
   description: Client-facing product. Always active and not soft-deleted.
@@ -153,3 +231,37 @@ ProductAdmin:
       required:
         - status
         - skus
+
+CreateProductRequest:
+  type: object
+  properties:
+    categoryId:
+      type: string
+      format: uuid
+    name:
+      type: string
+    description:
+      type: string
+  required:
+    - categoryId
+    - name
+  additionalProperties: false
+
+UpdateProductRequest:
+  type: object
+  description: >
+    Writing `status` is the "disable" capability — there is no separate
+    endpoint for it.
+  properties:
+    name:
+      type: string
+    description:
+      type:
+        - string
+        - 'null'
+    categoryId:
+      type: string
+      format: uuid
+    status:
+      $ref: '#/ProductStatus'
+  additionalProperties: false

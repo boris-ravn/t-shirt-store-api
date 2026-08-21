@@ -1,0 +1,294 @@
+/v1/products:
+  get:
+    operationId: listProducts
+    summary: List products
+    description: >
+      A client sees `Product` items scoped to `status = active AND deleted_at
+      IS NULL`; a manager sees `ProductAdmin` items scoped to all
+      non-deleted products, via `status` (manager-only — 403 for a client).
+      `sort=price` and `minPrice`/`maxPrice` require joining `skus` and
+      cannot use the `(category_id, created_at)` index that covers the
+      default sort and the `categoryId` filter.
+    tags: [products]
+    security: []
+    parameters:
+      - name: categoryId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        in: query
+        description: Matched against product name and description.
+        schema:
+          type: string
+      - name: minPrice
+        in: query
+        description: Minor units of the store currency.
+        schema:
+          type: integer
+          minimum: 0
+      - name: maxPrice
+        in: query
+        description: Minor units of the store currency.
+        schema:
+          type: integer
+          minimum: 0
+      - name: status
+        in: query
+        description: Manager only.
+        schema:
+          $ref: ../components/schemas/catalog.yaml#/ProductStatus
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+            - createdAt
+            - -createdAt
+            - price
+            - -price
+          default: -createdAt
+      - $ref: ../components/parameters.yaml#/LimitParam
+      - $ref: ../components/parameters.yaml#/OffsetParam
+    responses:
+      "200":
+        description: A page of products.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: ../components/schemas/catalog.yaml#/Product
+                    meta:
+                      $ref: ../components/schemas/common.yaml#/PaginationMeta
+                  required:
+                    - data
+                    - meta
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+                    meta:
+                      $ref: ../components/schemas/common.yaml#/PaginationMeta
+                  required:
+                    - data
+                    - meta
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  post:
+    operationId: createProduct
+    summary: Create a product
+    description: >
+      No SKUs and no images in the body — SKUs have their own guarded rules
+      and images are uploaded separately as multipart. Raises 404 if
+      `categoryId` does not reference an existing category.
+    tags: [products]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/CreateProductRequest
+    responses:
+      "201":
+        description: Product created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/products/{productId}:
+  get:
+    operationId: getProduct
+    summary: Get a product by id
+    description: >
+      A `disabled` product answers 404 for a client and 200 for a manager. A
+      soft-deleted product answers 404 for everyone.
+    tags: [products]
+    security: []
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    responses:
+      "200":
+        description: The product.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: ../components/schemas/catalog.yaml#/Product
+                - $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  patch:
+    operationId: updateProduct
+    summary: Update a product
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/UpdateProductRequest
+    responses:
+      "200":
+        description: Product updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: deleteProduct
+    summary: Delete a product
+    description: >
+      Soft delete, sets `deletedAt`. Idempotent: a second call on an
+      already-deleted product answers 404, since it is invisible everywhere
+      after the first call.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    responses:
+      "204":
+        description: Product deleted.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/products/{productId}/images:
+  post:
+    operationId: uploadProductImage
+    summary: Upload a product image
+    description: >
+      `multipart/form-data` with one `file` part. Accepted types: `image/jpeg`,
+      `image/png`, `image/webp`. Maximum size: 5 MiB.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              file:
+                type: string
+                format: binary
+            required:
+              - file
+            additionalProperties: false
+    responses:
+      "201":
+        description: Image uploaded.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductImage
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "413":
+        $ref: ../components/responses.yaml#/PayloadTooLarge
+      "415":
+        $ref: ../components/responses.yaml#/UnsupportedMediaType
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/products/{productId}/images/{imageId}:
+  patch:
+    operationId: updateProductImage
+    summary: Reposition a product image
+    description: >
+      `position` only. Renumbering siblings is a service concern — this
+      contract only promises the image collection is returned in `position`
+      order.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+      - $ref: ../components/parameters.yaml#/ImageIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/UpdateProductImageRequest
+    responses:
+      "200":
+        description: Image updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductImage
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: deleteProductImage
+    summary: Delete a product image
+    description: Hard delete — an image is never referenced by an order.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+      - $ref: ../components/parameters.yaml#/ImageIdParam
+    responses:
+      "204":
+        description: Image deleted.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

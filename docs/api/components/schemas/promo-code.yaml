@@ -87,6 +87,60 @@ PromoCode:
     - createdAt
     - updatedAt
 
+CreatePromoCodeRequest:
+  type: object
+  description: '`code` is normalised to uppercase on write.'
+  properties:
+    code:
+      type: string
+    discount:
+      $ref: '#/Discount'
+    minPurchaseAmount:
+      oneOf:
+        - $ref: ./common.yaml#/Money
+        - type: 'null'
+    expiresAt:
+      type: string
+      format: date-time
+    usageLimit:
+      type: integer
+      minimum: 1
+  required:
+    - code
+    - discount
+    - expiresAt
+    - usageLimit
+  additionalProperties: false
+
+UpdatePromoCodeRequest:
+  type: object
+  description: '`code` is not updatable — it is treated as immutable after creation, so order history can join through `promoCodeId` without a snapshot.'
+  properties:
+    discount:
+      $ref: '#/Discount'
+    minPurchaseAmount:
+      oneOf:
+        - $ref: ./common.yaml#/Money
+        - type: 'null'
+    expiresAt:
+      type: string
+      format: date-time
+    usageLimit:
+      type: integer
+      minimum: 1
+    isActive:
+      type: boolean
+  additionalProperties: false
+
+ValidatePromoCodeRequest:
+  type: object
+  properties:
+    code:
+      type: string
+  required:
+    - code
+  additionalProperties: false
+
 PromoCodeValidation:
   type: object
   properties:

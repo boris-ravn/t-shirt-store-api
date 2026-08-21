@@ -24,6 +24,15 @@ rules:
   operation-operationId-unique: error
   operation-tags: error
 
+  # oas3-schema false-positives on any externally-$ref'd path item or
+  # operation ("... property must not have unevaluated properties"),
+  # verified against Redocly lint on the same document, which reports the
+  # structure valid. Since every path in this contract is external-$ref'd
+  # by design, this would be one guaranteed false error per operation.
+  # Redocly lint (run alongside Spectral) is the base-schema-validity check
+  # instead; Spectral stays scoped to the conventions above.
+  oas3-schema: off
+
   # --- House rules ---
 
   operation-summary:

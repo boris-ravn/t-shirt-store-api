@@ -45,3 +45,7 @@ Both lint OpenAPI competently. Spectral was chosen for its custom rulesets: the 
 ### 2026-08-21 — The generated spec is reconciled against the hand-written one, never allowed to replace it
 
 Week 3 requires `@nestjs/swagger`, which produces a second OpenAPI document from decorators. The hand-written contract in `docs/api/` stays authoritative; the generated document is diffed against it with `oasdiff`, and a difference is treated as a bug in the implementation until argued otherwise. The alternative — letting the generated file become the truth — turns every accidental implementation detail into a silent contract change, which is the same drift that already cost us the `CLAUDE.md` invariant list.
+
+### 2026-08-21 — Spectral's `oas3-schema` rule disabled; Redocly lint covers base OAS validity instead
+
+Every path in this contract is an external `$ref` from `openapi.yaml` into `paths/*.yaml`, by design (modular files). Spectral's built-in `oas3-schema` rule false-positives on exactly that shape — `"<key>" property must not have unevaluated properties"` on every externally-`$ref`'d path item or operation — verified by cross-checking the same document with `redocly lint`, which reports it valid. Left enabled, this is one guaranteed error per operation, forever, making "zero Spectral errors" unattainable regardless of how correct the contract is. `oas3-schema` is turned off in `.spectral.yaml`; `redocly lint` runs alongside `spectral lint` as the base-schema-validity check, and Spectral stays scoped to the house rules it was chosen for.

@@ -49,21 +49,21 @@ OrderShippingDetails:
     recipientName:
       type: string
     phone:
-      oneOf:
-        - type: string
-        - type: 'null'
+      type:
+        - string
+        - 'null'
     line1:
       type: string
     line2:
-      oneOf:
-        - type: string
-        - type: 'null'
+      type:
+        - string
+        - 'null'
     city:
       type: string
     state:
-      oneOf:
-        - type: string
-        - type: 'null'
+      type:
+        - string
+        - 'null'
     postalCode:
       type: string
     country:
@@ -93,10 +93,10 @@ OrderStatusChange:
     status:
       $ref: '#/OrderStatus'
     changedBy:
-      oneOf:
-        - type: string
-          format: uuid
-        - type: 'null'
+      type:
+        - string
+        - 'null'
+      format: uuid
       description: Null when the transition was triggered by a webhook rather than a person.
     createdAt:
       type: string

@@ -27,10 +27,10 @@ CartItem:
         name:
           type: string
         imageUrl:
-          oneOf:
-            - type: string
-              format: uri
-            - type: 'null'
+          type:
+            - string
+            - 'null'
+          format: uri
       required:
         - id
         - name

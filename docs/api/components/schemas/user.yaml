@@ -21,10 +21,10 @@ User:
     role:
       $ref: '#/UserRole'
     passwordChangedAt:
-      oneOf:
-        - type: string
-          format: date-time
-        - type: 'null'
+      type:
+        - string
+        - 'null'
+      format: date-time
       description: 'Null means the password has never been changed since account creation.'
     createdAt:
       type: string

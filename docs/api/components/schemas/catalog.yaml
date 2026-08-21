@@ -89,10 +89,10 @@ SkuAdmin:
           minimum: 0
           description: Held by pending cart orders.
         deletedAt:
-          oneOf:
-            - type: string
-              format: date-time
-            - type: 'null'
+          type:
+            - string
+            - 'null'
+          format: date-time
       required:
         - skuCode
         - stock
@@ -112,9 +112,9 @@ Product:
     name:
       type: string
     description:
-      oneOf:
-        - type: string
-        - type: 'null'
+      type:
+        - string
+        - 'null'
     images:
       type: array
       items:

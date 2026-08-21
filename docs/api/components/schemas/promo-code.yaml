@@ -94,14 +94,15 @@ PromoCodeValidation:
       type: boolean
     reason:
       description: Populated, naming the failed rule, exactly when `valid` is false.
-      oneOf:
-        - type: string
-          enum:
-            - invalid
-            - expired
-            - exhausted
-            - minimum-not-met
-        - type: 'null'
+      type:
+        - string
+        - 'null'
+      enum:
+        - invalid
+        - expired
+        - exhausted
+        - minimum-not-met
+        - null
     discount:
       description: The computed discount amount. Null exactly when `valid` is false.
       oneOf:

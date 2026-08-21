@@ -1,0 +1,176 @@
+/v1/auth/sign-up:
+  post:
+    operationId: signUp
+    summary: Register a new client account
+    description: >
+      Returns a full session, not just the created user — a successful
+      sign-up has already proven the credentials. `role` is not an accepted
+      property; sending one is rejected by `forbidNonWhitelisted`, not
+      silently ignored. Raises 409 `email-already-registered` if the email
+      is taken.
+    tags: [auth]
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/auth.yaml#/SignUpRequest
+    responses:
+      "201":
+        description: Account created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/auth.yaml#/AuthSession
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "429":
+        $ref: ../components/responses.yaml#/TooManyRequests
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/auth/sign-in:
+  post:
+    operationId: signIn
+    summary: Sign in with email and password
+    description: >
+      Raises 401 `invalid-credentials` for both an unknown email and a wrong
+      password — the same message either way, so the response can't be used
+      to enumerate registered emails.
+    tags: [auth]
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/auth.yaml#/SignInRequest
+    responses:
+      "200":
+        description: Signed in.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/auth.yaml#/AuthSession
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "429":
+        $ref: ../components/responses.yaml#/TooManyRequests
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/auth/refresh:
+  post:
+    operationId: refreshTokens
+    summary: Exchange a refresh token for a new session
+    description: >
+      The refresh token travels in the body, not the `Authorization` header
+      — the access token may already be expired. Rotates the refresh token:
+      the old one is revoked as the new one is issued. Raises 401
+      `invalid-refresh-token` if the token is unknown, expired or already
+      revoked.
+    tags: [auth]
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/auth.yaml#/RefreshTokensRequest
+    responses:
+      "200":
+        description: New session issued.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/auth.yaml#/AuthSession
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "429":
+        $ref: ../components/responses.yaml#/TooManyRequests
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/auth/sign-out:
+  post:
+    operationId: signOut
+    summary: Revoke a refresh token
+    description: >
+      Sets `revoked_at` on the given refresh token, so a copy of it taken
+      before sign-out stops working. Raises 401 `invalid-refresh-token` if
+      the token is unknown or already revoked.
+    tags: [auth]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/auth.yaml#/SignOutRequest
+    responses:
+      "204":
+        description: Signed out.
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/auth/forgot-password:
+  post:
+    operationId: requestPasswordReset
+    summary: Request a password reset email
+    description: >
+      Always answers 202, whether or not the email belongs to an account —
+      a 404 here would be a user-enumeration oracle.
+    tags: [auth]
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/auth.yaml#/RequestPasswordResetRequest
+    responses:
+      "202":
+        description: Accepted. An email was sent if the address belongs to an account.
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "429":
+        $ref: ../components/responses.yaml#/TooManyRequests
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/auth/reset-password:
+  post:
+    operationId: resetPassword
+    summary: Reset a password using a reset token
+    description: >
+      Raises 400 `invalid-reset-token` for a token that is unknown, expired,
+      or already used — the same response for all three, so a caller can't
+      distinguish them. Sets `password_changed_at` and triggers the
+      password-change notification email.
+    tags: [auth]
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/auth.yaml#/ResetPasswordRequest
+    responses:
+      "204":
+        description: Password reset.
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "429":
+        $ref: ../components/responses.yaml#/TooManyRequests
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

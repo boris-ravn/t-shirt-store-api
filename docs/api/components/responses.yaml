@@ -186,7 +186,10 @@ Conflict:
             requested: 2
             available: 1
         promo-code-invalid:
-          summary: createOrder, validatePromoCode — the code does not exist or is inactive.
+          summary: >-
+            createOrder only — the code does not exist or is inactive.
+            validatePromoCode answers this same condition with 200 and
+            `reason: invalid`, not 409.
           value:
             type: https://api.tshirt-store.example/problems/promo-code-invalid
             title: Invalid promo code
@@ -194,7 +197,10 @@ Conflict:
             detail: This promo code does not exist or is not active.
             instance: /v1/orders
         promo-code-expired:
-          summary: createOrder, validatePromoCode — the code's expiry date has passed.
+          summary: >-
+            createOrder only — the code's expiry date has passed.
+            validatePromoCode answers this same condition with 200 and
+            `reason: expired`, not 409.
           value:
             type: https://api.tshirt-store.example/problems/promo-code-expired
             title: Promo code expired
@@ -203,7 +209,10 @@ Conflict:
             instance: /v1/orders
             expiresAt: "2026-01-01T00:00:00Z"
         promo-code-exhausted:
-          summary: createOrder, validatePromoCode — the usage limit has been reached.
+          summary: >-
+            createOrder only — the usage limit has been reached.
+            validatePromoCode answers this same condition with 200 and
+            `reason: exhausted`, not 409.
           value:
             type: https://api.tshirt-store.example/problems/promo-code-exhausted
             title: Promo code exhausted
@@ -212,7 +221,10 @@ Conflict:
             instance: /v1/orders
             usageLimit: 500
         promo-minimum-not-met:
-          summary: createOrder, validatePromoCode — the cart subtotal is below the code's minimum.
+          summary: >-
+            createOrder only — the cart subtotal is below the code's
+            minimum. validatePromoCode answers this same condition with 200
+            and `reason: minimum-not-met`, not 409.
           value:
             type: https://api.tshirt-store.example/problems/promo-minimum-not-met
             title: Minimum purchase not met

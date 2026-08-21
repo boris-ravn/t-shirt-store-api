@@ -35,7 +35,7 @@ t-shirt-store-api/
 ├── docs/
 │   ├── api/            # OpenAPI contract + its conventions (Week 2 design)
 │   ├── database/       # ERD in DBML + its rationale (Week 1 design)
-│   └── decisions.md    # append-only log of settled decisions
+│   └── decisions.md    # why the settled decisions were settled that way
 ├── src/                # application code
 ├── test/               # end-to-end specs
 └── CLAUDE.md           # project-scoped agent instructions

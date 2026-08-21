@@ -15,7 +15,7 @@ Two documents are the contract. Both outrank anything said in chat:
 
 If the code and one of those disagree, that is a bug in one of them. Name which one you think is wrong and stop; do not silently pick a side.
 
-`docs/api/CONVENTIONS.md` holds the binding rules for the contract — casing, error body, pagination, money, security, versioning, format precision, and how the document is authored. Read it before adding a path or a schema. `docs/decisions.md` is append-only history explaining why things are the way they are; add to it, never rewrite it.
+`docs/api/CONVENTIONS.md` holds the binding rules for the contract — casing, error body, pagination, money, security, versioning, format precision, and how the document is authored. Read it before adding a path or a schema. `docs/decisions.md` is history, not rules: it explains why things are the way they are. Append entries; never rewrite or delete one. A decision that gets overturned earns a new entry plus a supersession marker on the old, which is the only edit an existing entry ever takes.
 
 ---
 

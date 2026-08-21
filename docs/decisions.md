@@ -1,6 +1,14 @@
 # Decision log
 
-What was decided, why, and when. Append only — do not rewrite history in it.
+What was decided, why, and when.
+
+**What earns an entry.** A choice a reviewer would ask you to justify, whose reasoning is not recoverable from the code. Dependencies, layering, anything where the honest answer was "it depends". Not doc reorganisation, not naming, not anything the code already shows — a log padded with those is one nobody reads.
+
+**Entries are never rewritten or deleted.** When a decision is overturned, append a new entry and mark the old one. That marker is the only permitted edit to an existing entry:
+
+> **Superseded 2026-09-04** by "Redocly replaces Spectral in CI".
+
+The reasoning that turned out wrong is usually the most useful thing in the file. Editing it away removes the reason for keeping a log at all.
 
 This file is history, not rules. Binding conventions live where the work happens: [`api/CONVENTIONS.md`](api/CONVENTIONS.md) for the OpenAPI contract, the repo-root `CLAUDE.md` for code. When one of those changes, edit it there and add an entry here saying what changed and why.
 

@@ -17,6 +17,11 @@ servers:
 security:
   - bearerAuth: []
 
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: ./components/security-schemes.yaml#/bearerAuth
+
 tags:
   - name: auth
     description: Sign up / in / out, refresh tokens, forgot and reset password.

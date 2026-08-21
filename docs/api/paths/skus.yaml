@@ -1,0 +1,123 @@
+/v1/products/{productId}/skus:
+  post:
+    operationId: createSku
+    summary: Create a SKU for a product
+    description: Raises 409 `duplicate-sku` (with a `conflictingField` extension member) for either unique constraint.
+    tags: [skus]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/CreateSkuRequest
+    responses:
+      "201":
+        description: SKU created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/SkuAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/skus/{skuId}:
+  patch:
+    operationId: updateSku
+    summary: Update a SKU
+    description: Raises 409 `duplicate-sku` (with a `conflictingField` extension member) for either unique constraint.
+    tags: [skus]
+    parameters:
+      - $ref: ../components/parameters.yaml#/SkuIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/UpdateSkuRequest
+    responses:
+      "200":
+        description: SKU updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/SkuAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: deleteSku
+    summary: Delete a SKU
+    description: >
+      Soft delete. Raises 409 `sku-reserved` (with a `reservedQuantity`
+      extension member) when `reservedStock > 0` — pending orders hold those
+      units and the Release path still needs the row's counters to stay
+      coherent.
+    tags: [skus]
+    parameters:
+      - $ref: ../components/parameters.yaml#/SkuIdParam
+    responses:
+      "204":
+        description: SKU deleted.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/skus/{skuId}/restock:
+  post:
+    operationId: restockSku
+    summary: Add stock to a SKU
+    description: A delta added to `stock`, not an absolute value — see `UpdateSkuRequest` for why.
+    tags: [skus]
+    parameters:
+      - $ref: ../components/parameters.yaml#/SkuIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/RestockSkuRequest
+    responses:
+      "200":
+        description: SKU restocked.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/SkuAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

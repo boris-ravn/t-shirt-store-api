@@ -1,0 +1,115 @@
+/v1/cart:
+  get:
+    operationId: getCart
+    summary: Get the caller's own cart
+    description: Created on first read if the caller has none — this operation never 404s.
+    tags: [cart]
+    responses:
+      "200":
+        description: The caller's cart.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/cart.yaml#/Cart
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/cart/items:
+  post:
+    operationId: addCartItem
+    summary: Add an item to the caller's cart
+    description: >
+      Increments quantity if the SKU is already in the cart, per the
+      `(cartId, skuId)` unique constraint. Returns the whole cart so the
+      client never has to re-fetch for updated totals.
+    tags: [cart]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/cart.yaml#/AddCartItemRequest
+    responses:
+      "200":
+        description: The updated cart.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/cart.yaml#/Cart
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: clearCart
+    summary: Remove every item from the caller's cart
+    description: The cart row itself survives — only its items are removed.
+    tags: [cart]
+    responses:
+      "204":
+        description: Cart cleared.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/cart/items/{cartItemId}:
+  patch:
+    operationId: updateCartItem
+    summary: Set a cart item's quantity
+    tags: [cart]
+    parameters:
+      - $ref: ../components/parameters.yaml#/CartItemIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/cart.yaml#/UpdateCartItemRequest
+    responses:
+      "200":
+        description: The updated cart.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/cart.yaml#/Cart
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: removeCartItem
+    summary: Remove one item from the caller's cart
+    description: 404 if the item belongs to another user's cart.
+    tags: [cart]
+    parameters:
+      - $ref: ../components/parameters.yaml#/CartItemIdParam
+    responses:
+      "204":
+        description: Item removed.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

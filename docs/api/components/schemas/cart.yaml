@@ -43,6 +43,34 @@ CartItem:
     - sku
     - product
 
+AddCartItemRequest:
+  type: object
+  description: >
+    No stock check here — reservation happens at order creation, inside the
+    same transaction as the guarded stock `UPDATE`.
+  properties:
+    skuId:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+  required:
+    - skuId
+    - quantity
+  additionalProperties: false
+
+UpdateCartItemRequest:
+  type: object
+  description: 'Absolute, not a delta. `quantity: 0` is a validation failure — deletion has its own verb.'
+  properties:
+    quantity:
+      type: integer
+      minimum: 1
+  required:
+    - quantity
+  additionalProperties: false
+
 Cart:
   type: object
   description: Created on first read if the caller has none. `items` is a plain array, not a paginated collection.

@@ -1,0 +1,389 @@
+// T-Shirt Store API - ERD
+// Money is stored in minor units (cents). Single currency store-wide.
+
+Enum user_role {
+  manager
+  client
+  delivery_person
+}
+
+Enum product_status {
+  active
+  disabled
+}
+
+Enum order_status {
+  pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+Enum payment_method {
+  payment_link
+  payment_intent
+}
+
+Enum payment_status {
+  pending
+  succeeded
+  failed
+  refunded
+}
+
+Enum notification_status {
+  pending
+  sent
+  failed
+}
+
+Enum discount_type {
+  percentage
+  fixed_amount
+}
+
+// ---------------------------------------------------------------- auth
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar [not null, unique]
+  password_hash varchar [not null]
+  first_name varchar [not null]
+  last_name varchar [not null]
+  role user_role [not null, default: 'client']
+  password_changed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Sign-up never accepts a role; manager and delivery_person are provisioned out of band.'
+}
+
+Table password_reset_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+  }
+}
+
+Table refresh_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar [not null, unique]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+  }
+}
+
+// ---------------------------------------------------------------- catalog
+
+Table categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar [not null, unique]
+  slug varchar [not null, unique]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table products {
+  id uuid [pk, default: `gen_random_uuid()`]
+  category_id uuid [not null, ref: > categories.id]
+  name varchar [not null]
+  description text
+  status product_status [not null, default: 'active']
+  deleted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (category_id, created_at)
+  }
+
+  Note: 'disabled = hidden from clients, visible to managers. deleted_at = hidden everywhere (soft delete; order_items.product_id is a real FK).'
+}
+
+Table product_images {
+  id uuid [pk, default: `gen_random_uuid()`]
+  product_id uuid [not null, ref: > products.id]
+  s3_key varchar [not null]
+  position int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (product_id, position)
+  }
+}
+
+Table skus {
+  id uuid [pk, default: `gen_random_uuid()`]
+  product_id uuid [not null, ref: > products.id]
+  sku_code varchar [not null, unique]
+  size varchar [not null]
+  color varchar [not null]
+  price int [not null, note: 'minor units']
+  stock int [not null, default: 0, note: 'units physically held, decremented on successful payment']
+  reserved_stock int [not null, default: 0, note: 'held by pending cart orders; available = stock - reserved_stock']
+  deleted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    product_id
+    (product_id, size, color) [unique]
+  }
+
+  Note: 'Stock moves via 5 guarded UPDATEs — reserve/fulfil/release/restock/direct-sale (see docs). CHECK (stock >= 0 AND reserved_stock BETWEEN 0 AND stock) holds throughout. sku_code and (product_id, size, color) unique constraints need to become partial WHERE deleted_at IS NULL at migration time (see docs).'
+}
+
+// ---------------------------------------------------------------- cart
+
+Table carts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, unique, ref: - users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table cart_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  cart_id uuid [not null, ref: > carts.id]
+  sku_id uuid [not null, ref: > skus.id]
+  quantity int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (cart_id, sku_id) [unique]
+  }
+}
+
+Table likes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  product_id uuid [not null, ref: > products.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    product_id
+    (user_id, product_id) [unique]
+  }
+}
+
+// ---------------------------------------------------------------- promotions
+
+Table promo_codes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar [not null, unique, note: 'stored uppercase, normalized on write']
+  discount_type discount_type [not null]
+  discount_value int [not null, note: 'percentage: whole percent, CHECK between 1 and 100. fixed_amount: minor units']
+  min_purchase_amount int [note: 'minor units, compared against orders.subtotal before discount. Null means no minimum']
+  expires_at timestamptz [not null]
+  usage_limit int [not null]
+  times_redeemed int [not null, default: 0, note: 'reserved at order creation, released on any cancellation']
+  is_active boolean [not null, default: true]
+  created_by uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'times_redeemed moves via guarded UPDATEs tied to order creation/cancellation, never incremented directly (see docs).'
+}
+
+// ---------------------------------------------------------------- orders
+
+Table orders {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  status order_status [not null, default: 'pending']
+  subtotal int [not null, note: 'minor units, sum of quantity * unit_price over order_items']
+  promo_code_id uuid [ref: > promo_codes.id]
+  discount_amount int [not null, default: 0, note: 'minor units']
+  total int [not null, note: 'minor units. Invariant: total = subtotal - discount_amount, and payments.amount = total']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, created_at)
+    (user_id, status, created_at)
+    (status, created_at)
+    promo_code_id
+  }
+
+  Note: 'promo_code_id/discount_amount apply only to payment-intent orders. No delivery_person_id by design (see docs).'
+}
+
+Table order_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  sku_id uuid [not null, ref: > skus.id]
+  product_id uuid [not null, ref: > products.id]
+  quantity int [not null]
+  unit_price int [not null, note: 'minor units, snapshot at purchase']
+  product_name varchar [not null, note: 'snapshot at purchase']
+  size varchar [not null]
+  color varchar [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    order_id
+    sku_id
+    product_id
+  }
+}
+
+Table order_shipping_details {
+  order_id uuid [pk, ref: - orders.id]
+  recipient_name varchar [not null]
+  phone varchar [note: 'nullable: Stripe does not always collect one']
+  line1 varchar [not null]
+  line2 varchar
+  city varchar [not null]
+  state varchar [note: 'nullable: not every country has one']
+  postal_code varchar [not null]
+  country char(2) [not null, note: 'ISO 3166-1 alpha-2']
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Snapshot from the payment webhook; order_id as PK enforces 1:1. Unpaid orders have no row.'
+}
+
+Table order_status_history {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  status order_status [not null]
+  changed_by uuid [ref: > users.id]
+  created_at timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (order_id, created_at)
+    (changed_by, status, created_at)
+  }
+}
+
+// ---------------------------------------------------------------- payments
+
+Table payment_links {
+  id uuid [pk, default: `gen_random_uuid()`]
+  sku_id uuid [not null, ref: > skus.id]
+  stripe_payment_link_id varchar [not null, unique]
+  stripe_price_id varchar [not null]
+  unit_amount int [not null, note: 'minor units']
+  deactivated_at timestamptz [note: 'set when available stock reaches zero, to shrink the oversell window']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    sku_id
+  }
+
+  Note: 'One reusable link per SKU; buyer identified via client_reference_id, not stored here (see docs).'
+}
+
+Table payments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  method payment_method [not null]
+  payment_link_id uuid [ref: > payment_links.id]
+  stripe_checkout_session_id varchar [unique]
+  stripe_payment_intent_id varchar [unique]
+  stripe_refund_id varchar
+  amount int [not null, note: 'minor units']
+  currency char(3) [not null, default: 'usd']
+  status payment_status [not null, default: 'pending']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    order_id
+  }
+
+  Note: 'order_id is non-unique (retries get a row each); a partial UNIQUE (order_id) WHERE status = succeeded is the real idempotency backstop (see docs).'
+}
+
+Table stripe_webhook_events {
+  id varchar [pk, note: 'Stripe event id; idempotency key']
+  type varchar [not null]
+  payload jsonb [not null]
+  processed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---------------------------------------------------------------- notifications
+
+Table low_stock_events {
+  id uuid [pk, default: `gen_random_uuid()`]
+  product_id uuid [not null, ref: > products.id]
+  triggered_by_sku_id uuid [ref: > skus.id]
+  stock_at_trigger int [not null]
+  resolved_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (product_id, created_at)
+  }
+
+  Note: 'Fires on stock post-sale, not available stock — a reservation is not a sale.'
+}
+
+Table stock_notifications {
+  id uuid [pk, default: `gen_random_uuid()`]
+  low_stock_event_id uuid [not null, ref: > low_stock_events.id]
+  user_id uuid [not null, ref: > users.id]
+  status notification_status [not null, default: 'pending']
+  error_message text
+  sent_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (low_stock_event_id, user_id) [unique]
+  }
+}
+
+TableGroup auth {
+  users
+  password_reset_tokens
+  refresh_tokens
+}
+
+TableGroup catalog {
+  categories
+  products
+  product_images
+  skus
+}
+
+TableGroup cart {
+  carts
+  cart_items
+  likes
+}
+
+TableGroup promotions {
+  promo_codes
+}
+
+TableGroup ordering {
+  orders
+  order_items
+  order_shipping_details
+  order_status_history
+}
+
+TableGroup payments_group {
+  payment_links
+  payments
+  stripe_webhook_events
+}
+
+TableGroup notifications {
+  low_stock_events
+  stock_notifications
+}

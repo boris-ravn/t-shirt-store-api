@@ -2,7 +2,7 @@
 #
 # The point is not catching malformed YAML — spectral:oas already does that —
 # it is enforcing the conventions this project actually cares about, per
-# docs/api/CONVENTIONS.md and docs/api/openapi-plan.md §9.
+# docs/api/CONVENTIONS.md.
 #
 # Operation objects are addressed with a plain JSONPath method-list, not the
 # built-in `#OperationObject` alias: that alias did not resolve when referenced

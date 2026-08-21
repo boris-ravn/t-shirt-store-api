@@ -210,8 +210,8 @@
     summary: Get an order by id
     description: >
       404, not 403, when a client asks for another client's order — its
-      existence is not disclosed. A client sees `Order`; a manager sees
-      `OrderAdmin`.
+      existence is not disclosed. A client or a delivery person sees
+      `Order`; a manager sees `OrderAdmin`.
     tags: [orders]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam

@@ -208,7 +208,10 @@
   get:
     operationId: getOrder
     summary: Get an order by id
-    description: 404, not 403, when a client asks for another client's order — its existence is not disclosed.
+    description: >
+      404, not 403, when a client asks for another client's order — its
+      existence is not disclosed. A client sees `Order`; a manager sees
+      `OrderAdmin`.
     tags: [orders]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam
@@ -238,7 +241,9 @@
       `shipped`, `delivered` or `cancelled`. Triggers Release or Restock
       depending on the order's previous status read under lock, plus a
       Release on the promo code if one was applied. Callable by the order's
-      own client, or by a manager.
+      own client, or by a manager — the only transition with two distinct
+      caller roles, so like `getOrder` it returns `Order` to the client and
+      `OrderAdmin` to the manager.
     tags: [orders]
     parameters:
       - $ref: ../components/parameters.yaml#/OrderIdParam
@@ -248,7 +253,9 @@
         content:
           application/json:
             schema:
-              $ref: ../components/schemas/order.yaml#/Order
+              anyOf:
+                - $ref: ../components/schemas/order.yaml#/Order
+                - $ref: ../components/schemas/order.yaml#/OrderAdmin
       "401":
         $ref: ../components/responses.yaml#/Unauthorized
       "403":

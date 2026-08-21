@@ -179,7 +179,8 @@
     summary: Get a product by id
     description: >
       A `disabled` product answers 404 for a client and 200 for a manager. A
-      soft-deleted product answers 404 for everyone.
+      soft-deleted product answers 404 for everyone. A client sees `Product`;
+      a manager sees `ProductAdmin`.
     tags: [products]
     security: []
     parameters:
@@ -200,6 +201,7 @@
   patch:
     operationId: updateProduct
     summary: Update a product
+    description: Partial update — any field omitted from the body is left unchanged.
     tags: [products]
     parameters:
       - $ref: ../components/parameters.yaml#/ProductIdParam

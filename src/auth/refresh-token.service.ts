@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import ms from 'ms';
 import type { StringValue } from 'ms';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateOpaqueToken, hashToken } from '../common/crypto/token.util';
 import { InvalidRefreshTokenException } from './exceptions/invalid-refresh-token.exception';
@@ -65,6 +66,19 @@ export class RefreshTokenService {
     }
 
     await this.revokeRowOrThrow(existing.id);
+  }
+
+  // Takes an optional transaction client so a caller (resetPassword) can
+  // revoke every session in the same transaction as the password change
+  // itself, instead of two independent writes that could half-succeed.
+  async revokeAllForUser(
+    userId: string,
+    client: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    await client.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   private async revokeRowOrThrow(id: string): Promise<void> {

@@ -117,9 +117,17 @@ export class AuthService {
   async resetPassword(dto: ResetPasswordRequestDto): Promise<void> {
     const { userId } = await this.passwordResetTokenService.consume(dto.token);
     const passwordHash = await this.passwordService.hash(dto.password);
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash, passwordChangedAt: new Date() },
+
+    // A reset must both change the password and kill any session an
+    // attacker may already hold — same transaction, so neither can succeed
+    // without the other.
+    const user = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash, passwordChangedAt: new Date() },
+      });
+      await this.refreshTokenService.revokeAllForUser(userId, tx);
+      return updated;
     });
 
     await this.mailService.sendPasswordChangedEmail(user.email, user.firstName);

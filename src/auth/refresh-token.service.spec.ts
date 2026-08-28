@@ -165,4 +165,14 @@ describe('RefreshTokenService', () => {
       });
     });
   });
+
+  describe('revokeAllForUser', () => {
+    it.todo(
+      'revokes every non-revoked row for the user (updateMany WHERE userId AND revokedAt IS NULL)',
+    );
+
+    it.todo(
+      'uses the passed-in transaction client instead of the injected PrismaService, when one is given',
+    );
+  });
 });

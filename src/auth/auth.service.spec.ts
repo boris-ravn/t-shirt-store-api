@@ -21,6 +21,7 @@ describe('AuthService', () => {
       update: jest.Mock;
       findUniqueOrThrow: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
   let passwordService: { hash: jest.Mock; compare: jest.Mock };
   let jwtService: { signAsync: jest.Mock };
@@ -29,6 +30,7 @@ describe('AuthService', () => {
     issue: jest.Mock;
     rotate: jest.Mock;
     revoke: jest.Mock;
+    revokeAllForUser: jest.Mock;
   };
   let passwordResetTokenService: { issue: jest.Mock; consume: jest.Mock };
   let mailService: {
@@ -56,7 +58,14 @@ describe('AuthService', () => {
         update: jest.fn(),
         findUniqueOrThrow: jest.fn(),
       },
+      // Runs the callback with the same mock object as `tx` — Boris's
+      // existing assertions on prisma.user.update keep working unchanged
+      // since tx.user.update === prisma.user.update here.
+      $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
+    );
     passwordService = {
       hash: jest.fn(),
       compare: jest.fn(),
@@ -73,6 +82,7 @@ describe('AuthService', () => {
       issue: jest.fn(),
       rotate: jest.fn(),
       revoke: jest.fn(),
+      revokeAllForUser: jest.fn(),
     };
     passwordResetTokenService = {
       issue: jest.fn(),
@@ -337,5 +347,9 @@ describe('AuthService', () => {
         updatedUser.firstName,
       );
     });
+
+    it.todo(
+      'revokes every refresh token for the user in the same transaction as the password update (refreshTokenService.revokeAllForUser called with userId and the tx client)',
+    );
   });
 });

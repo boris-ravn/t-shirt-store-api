@@ -25,6 +25,9 @@ describe('SkusService', () => {
     deletedAt: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
+    // getActiveOrThrow includes the parent product's deletedAt alongside
+    // the SKU's own — spread by every test below unless overridden.
+    product: { deletedAt: null },
   };
 
   // Real PrismaClientKnownRequestError instances, meta shaped like
@@ -162,6 +165,10 @@ describe('SkusService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it.todo(
+      'throws NotFoundException when the SKU is active but its parent product is soft-deleted',
+    );
+
     it('throws DuplicateSkuException on either unique constraint, distinguished by index name', async () => {
       prisma.sku.findUnique.mockResolvedValue(activeSku);
 
@@ -200,6 +207,10 @@ describe('SkusService', () => {
 
       expect(prisma.sku.update).not.toHaveBeenCalled();
     });
+
+    it.todo(
+      'throws NotFoundException when the SKU is active but its parent product is soft-deleted',
+    );
 
     it('throws SkuReservedException with the real reservedStock when reservedStock > 0', async () => {
       prisma.sku.findUnique.mockResolvedValue({
@@ -249,6 +260,10 @@ describe('SkusService', () => {
 
       expect(prisma.sku.update).not.toHaveBeenCalled();
     });
+
+    it.todo(
+      'throws NotFoundException when the SKU is active but its parent product is soft-deleted',
+    );
 
     it('increments stock by quantity (a delta, not an absolute value)', async () => {
       prisma.sku.findUnique.mockResolvedValue(activeSku);

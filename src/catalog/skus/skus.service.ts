@@ -87,9 +87,15 @@ export class SkusService {
     return SkuAdminResponseDto.fromEntity(sku);
   }
 
+  // Also checks the parent product, not just the SKU's own deletedAt — a
+  // SKU belonging to a soft-deleted product shouldn't be independently
+  // manageable through /v1/skus/{id} once the product itself is gone.
   private async getActiveOrThrow(id: string) {
-    const sku = await this.prisma.sku.findUnique({ where: { id } });
-    if (!sku || sku.deletedAt) {
+    const sku = await this.prisma.sku.findUnique({
+      where: { id },
+      include: { product: { select: { deletedAt: true } } },
+    });
+    if (!sku || sku.deletedAt || sku.product.deletedAt) {
       throw new NotFoundException();
     }
     return sku;

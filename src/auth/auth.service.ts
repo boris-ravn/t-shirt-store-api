@@ -7,7 +7,9 @@ import { UserRole } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthSessionResponseDto } from './dto/auth-session-response.dto';
+import { RefreshTokensRequestDto } from './dto/refresh-tokens-request.dto';
 import { SignInRequestDto } from './dto/sign-in-request.dto';
+import { SignOutRequestDto } from './dto/sign-out-request.dto';
 import { SignUpRequestDto } from './dto/sign-up-request.dto';
 import { EmailAlreadyRegisteredException } from './exceptions/email-already-registered.exception';
 import { InvalidCredentialsException } from './exceptions/invalid-credentials.exception';
@@ -72,6 +74,20 @@ export class AuthService {
     }
 
     return this.issueSession(user);
+  }
+
+  async refreshTokens(
+    dto: RefreshTokensRequestDto,
+  ): Promise<AuthSessionResponseDto> {
+    const { userId } = await this.refreshTokenService.rotate(dto.refreshToken);
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+    return this.issueSession(user);
+  }
+
+  async signOut(dto: SignOutRequestDto): Promise<void> {
+    await this.refreshTokenService.revoke(dto.refreshToken);
   }
 
   private async issueSession(

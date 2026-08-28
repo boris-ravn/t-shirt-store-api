@@ -16,9 +16,14 @@ import { ProductListResponseDto } from './dto/product-list-response.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { UpdateProductRequestDto } from './dto/update-product-request.dto';
 
+// Soft-deleted SKUs are excluded for every caller, matching how a
+// soft-deleted product itself is invisible even to managers (only the
+// reversible `disabled` status stays manager-visible) — see
+// docs/database/README.md §8. Images get a deterministic order at the
+// query level rather than relying only on the DTO's in-memory sort.
 const PRODUCT_INCLUDE = {
-  images: true,
-  skus: true,
+  images: { orderBy: { position: 'asc' } },
+  skus: { where: { deletedAt: null } },
 } satisfies Prisma.ProductInclude;
 
 type ProductWithRelations = Prisma.ProductGetPayload<{
@@ -43,7 +48,7 @@ export class ProductsService {
     }
 
     const where = this.buildWhere(query, isManager);
-    const total = await this.prisma.product.count({ where });
+    const total = await this.countTotal(where, query);
     const products = await this.findProductsPage(where, query);
 
     if (isManager) {
@@ -183,6 +188,24 @@ export class ProductsService {
     };
   }
 
+  // For sort=price/-price, `total` must match what sku.groupBy below can
+  // actually page through: a product with zero non-deleted SKUs never
+  // appears in that grouped result (an implicit inner join), so counting
+  // it would inflate `total` past what a client can page to. Combined via
+  // `AND` rather than a second top-level `skus` key, since `where` may
+  // already carry its own `skus.some` clause from the price-range filter.
+  private async countTotal(
+    where: Prisma.ProductWhereInput,
+    query: ListProductsQueryDto,
+  ): Promise<number> {
+    if (query.sort !== 'price' && query.sort !== '-price') {
+      return this.prisma.product.count({ where });
+    }
+    return this.prisma.product.count({
+      where: { AND: [where, { skus: { some: { deletedAt: null } } }] },
+    });
+  }
+
   // `sort=price`/`-price` can't be expressed as a plain Prisma `orderBy` on
   // a to-many relation — SkuOrderByRelationAggregateInput only supports
   // `_count` (verified against the generated client's own types), not
@@ -209,7 +232,9 @@ export class ProductsService {
       by: ['productId'],
       where: { deletedAt: null, product: where },
       _min: { price: true },
-      orderBy: { _min: { price: direction } },
+      // productId as a tiebreaker: Postgres gives no ordering guarantee
+      // across pages for rows tied on price alone.
+      orderBy: [{ _min: { price: direction } }, { productId: 'asc' }],
       skip: query.offset,
       take: query.limit,
     });

@@ -22,8 +22,15 @@ describe('ProductsService', () => {
   const managerUser = { id: 'manager-1', role: 'manager' as const };
   const clientUser = { id: 'client-1', role: 'client' as const };
 
+  // The include shape products.service.ts actually asks Prisma for —
+  // non-deleted SKUs only, images in position order.
+  const EXPECTED_PRODUCT_INCLUDE = {
+    images: { orderBy: { position: 'asc' } },
+    skus: { where: { deletedAt: null } },
+  };
+
   // A product row shaped like Prisma's findUnique/findMany result with
-  // { include: { images: true, skus: true } } — active, not deleted.
+  // { include: EXPECTED_PRODUCT_INCLUDE } — active, not deleted.
   const activeProduct = {
     id: 'product-1',
     categoryId: 'category-1',
@@ -200,6 +207,10 @@ describe('ProductsService', () => {
       });
     });
 
+    it.todo(
+      'excludes soft-deleted SKUs from every response (the skus include is scoped to deletedAt: null, for both client and manager shapes)',
+    );
+
     it('uses sku.groupBy + a hydration query, not product.findMany.orderBy, when sort is price/-price', async () => {
       prisma.product.count.mockResolvedValue(1);
       prisma.sku.groupBy.mockResolvedValue([{ productId: 'product-1' }]);
@@ -211,16 +222,20 @@ describe('ProductsService', () => {
         expect.objectContaining({
           by: ['productId'],
           _min: { price: true },
-          orderBy: { _min: { price: 'asc' } },
+          orderBy: [{ _min: { price: 'asc' } }, { productId: 'asc' }],
           skip: 0,
           take: 20,
         }),
       );
       expect(prisma.product.findMany).toHaveBeenCalledWith({
         where: { id: { in: ['product-1'] } },
-        include: { images: true, skus: true },
+        include: EXPECTED_PRODUCT_INCLUDE,
       });
     });
+
+    it.todo(
+      "computes `total` from a query that also requires >=1 non-deleted SKU when sort is price/-price, so it can't exceed what's actually reachable through that sort mode",
+    );
 
     // findProductsPage re-sorts the hydrated rows to match the groupBy
     // order explicitly (via the ids.map(...).filter(...) pass) rather than
@@ -327,7 +342,7 @@ describe('ProductsService', () => {
           name: 'Classic Tee',
           description: 'A cotton crewneck.',
         },
-        include: { images: true, skus: true },
+        include: EXPECTED_PRODUCT_INCLUDE,
       });
       expect(result).toEqual(
         expect.objectContaining({ id: activeProduct.id, status: 'active' }),
@@ -374,7 +389,7 @@ describe('ProductsService', () => {
           categoryId: undefined,
           status: 'disabled',
         },
-        include: { images: true, skus: true },
+        include: EXPECTED_PRODUCT_INCLUDE,
       });
       expect(result.status).toBe('disabled');
     });

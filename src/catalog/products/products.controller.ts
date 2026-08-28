@@ -10,10 +10,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiExtraModels,
   ApiNoContentResponse,
@@ -22,6 +27,7 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 import { CheckPolicies } from '../../casl/check-policies.decorator';
 import { PoliciesGuard } from '../../casl/policies.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -32,10 +38,18 @@ import { CreateProductRequestDto } from './dto/create-product-request.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { ProductAdminListResponseDto } from './dto/product-list-response.dto';
 import { ProductAdminResponseDto } from './dto/product-admin-response.dto';
+import { ProductImageResponseDto } from './dto/product-image-response.dto';
 import { ProductListResponseDto } from './dto/product-list-response.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
+import { UpdateProductImageRequestDto } from './dto/update-product-image-request.dto';
 import { UpdateProductRequestDto } from './dto/update-product-request.dto';
+import {
+  ACCEPTED_IMAGE_MIME_TYPES,
+  MULTER_HARD_CEILING_BYTES,
+} from './product-image.constants';
+import { ProductImagesService } from './product-images.service';
 import { ProductsService } from './products.service';
+import { UnsupportedImageTypeException } from './exceptions/unsupported-image-type.exception';
 
 @ApiTags('products')
 @ApiExtraModels(
@@ -46,7 +60,10 @@ import { ProductsService } from './products.service';
 )
 @Controller('v1/products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly productImagesService: ProductImagesService,
+  ) {}
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
@@ -128,5 +145,74 @@ export class ProductsController {
     @Param('productId', ParseUUIDPipe) productId: string,
   ): Promise<void> {
     await this.productsService.delete(productId);
+  }
+
+  @Post(':productId/images')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('manage', 'Product'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MULTER_HARD_CEILING_BYTES },
+      fileFilter: (_req, file, callback) => {
+        if (
+          !(ACCEPTED_IMAGE_MIME_TYPES as readonly string[]).includes(
+            file.mimetype,
+          )
+        ) {
+          callback(
+            new UnsupportedImageTypeException(ACCEPTED_IMAGE_MIME_TYPES),
+            false,
+          );
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+      required: ['file'],
+    },
+  })
+  @ApiOperation({ summary: 'Upload a product image' })
+  @ApiCreatedResponse({ type: ProductImageResponseDto })
+  uploadImage(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<ProductImageResponseDto> {
+    return this.productImagesService.upload(productId, file);
+  }
+
+  @Patch(':productId/images/:imageId')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('manage', 'Product'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reposition a product image' })
+  @ApiOkResponse({ type: ProductImageResponseDto })
+  updateImage(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Body() dto: UpdateProductImageRequestDto,
+  ): Promise<ProductImageResponseDto> {
+    return this.productImagesService.updatePosition(productId, imageId, dto);
+  }
+
+  @Delete(':productId/images/:imageId')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('manage', 'Product'))
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a product image' })
+  @ApiNoContentResponse()
+  async deleteImage(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+  ): Promise<void> {
+    await this.productImagesService.delete(productId, imageId);
   }
 }

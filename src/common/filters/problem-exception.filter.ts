@@ -34,6 +34,19 @@ const DEFAULT_PROBLEMS: Partial<
     slug: 'rate-limit-exceeded',
     title: 'Too many requests',
   },
+  // Safety net for multer's own MULTER_HARD_CEILING_BYTES (see
+  // product-image.constants.ts) — the real, precise image-too-large
+  // Problem (with maxBytes/receivedBytes) is thrown directly by
+  // ProductImagesService against the fully-buffered file, so this only
+  // fires if the generous streaming ceiling itself is hit first.
+  [HttpStatus.PAYLOAD_TOO_LARGE]: {
+    slug: 'image-too-large',
+    title: 'Image too large',
+  },
+  [HttpStatus.UNSUPPORTED_MEDIA_TYPE]: {
+    slug: 'unsupported-image-type',
+    title: 'Unsupported image type',
+  },
 };
 
 @Catch()
@@ -86,9 +99,13 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     );
   }
 
-  // Covers errors that never go through Nest's HttpException at all —
-  // e.g. body-parser's JSON-parse failure and multer's file-size guard both
-  // throw a plain Error carrying `status`/`statusCode`, not an HttpException.
+  // Covers errors that never go through Nest's HttpException at all — e.g.
+  // body-parser's JSON-parse failure throws a plain Error carrying
+  // `status`/`statusCode`, not an HttpException. (Multer's own file-size
+  // limit is different: @nestjs/platform-express's transformException
+  // converts it into a real PayloadTooLargeException before it gets here,
+  // so that one is handled by the isProblemDocument/HttpException branch,
+  // via the DEFAULT_PROBLEMS fallback above — not this method.)
   private extractStatus(exception: unknown): number | undefined {
     if (typeof exception === 'object' && exception !== null) {
       const candidate = exception as { status?: unknown; statusCode?: unknown };

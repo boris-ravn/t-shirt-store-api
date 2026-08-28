@@ -1,11 +1,13 @@
-/v1/products/{productId}/skus:
+/v1/skus:
   post:
     operationId: createSku
     summary: Create a SKU for a product
-    description: Raises 409 `duplicate-sku` (with a `conflictingField` extension member) for either unique constraint.
+    description: >
+      `productId` is a body field, not a path segment — consistent with
+      `createProduct`'s `categoryId`. Raises 404 if `productId` does not
+      reference an existing product, or 409 `duplicate-sku` (with a
+      `conflictingField` extension member) for either unique constraint.
     tags: [skus]
-    parameters:
-      - $ref: ../components/parameters.yaml#/ProductIdParam
     requestBody:
       required: true
       content:

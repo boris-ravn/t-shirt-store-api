@@ -74,8 +74,8 @@ paths:
     $ref: ./paths/products.yaml#/~1v1~1products~1{productId}~1images
   /v1/products/{productId}/images/{imageId}:
     $ref: ./paths/products.yaml#/~1v1~1products~1{productId}~1images~1{imageId}
-  /v1/products/{productId}/skus:
-    $ref: ./paths/skus.yaml#/~1v1~1products~1{productId}~1skus
+  /v1/skus:
+    $ref: ./paths/skus.yaml#/~1v1~1skus
   /v1/skus/{skuId}:
     $ref: ./paths/skus.yaml#/~1v1~1skus~1{skuId}
   /v1/skus/{skuId}/restock:

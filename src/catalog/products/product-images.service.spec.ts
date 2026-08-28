@@ -12,7 +12,7 @@ describe('ProductImagesService', () => {
   let prisma: {
     product: { findUnique: jest.Mock };
     productImage: {
-      count: jest.Mock;
+      aggregate: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
@@ -45,7 +45,7 @@ describe('ProductImagesService', () => {
     prisma = {
       product: { findUnique: jest.fn() },
       productImage: {
-        count: jest.fn(),
+        aggregate: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
@@ -116,14 +116,17 @@ describe('ProductImagesService', () => {
       expect(prisma.productImage.create).not.toHaveBeenCalled();
     });
 
-    it('uploads to S3 and persists position = current image count', async () => {
+    it('uploads to S3 and persists position = MAX(position) + 1', async () => {
       prisma.product.findUnique.mockResolvedValue({
         id: 'product-1',
         deletedAt: null,
       });
-      // Two images already exist for this product — the trivial case (0)
-      // would pass even if `position` were hardcoded instead of derived.
-      prisma.productImage.count.mockResolvedValue(2);
+      // Existing max position is 1 (e.g. two images at 0 and 1) — the
+      // trivial case (no images, max undefined) would pass even if
+      // `position` were hardcoded instead of derived.
+      prisma.productImage.aggregate.mockResolvedValue({
+        _max: { position: 1 },
+      });
       prisma.productImage.create.mockImplementation(
         ({
           data,
@@ -141,8 +144,9 @@ describe('ProductImagesService', () => {
 
       const result = await service.upload('product-1', validFile);
 
-      expect(prisma.productImage.count).toHaveBeenCalledWith({
+      expect(prisma.productImage.aggregate).toHaveBeenCalledWith({
         where: { productId: 'product-1' },
+        _max: { position: true },
       });
       expect(s3Service.upload).toHaveBeenCalledWith(
         expect.stringMatching(/^products\/product-1\/.+\.png$/),

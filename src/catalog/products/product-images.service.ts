@@ -32,9 +32,15 @@ export class ProductImagesService {
     const s3Key = `products/${productId}/${randomUUID()}.${extensionForMimeType(file.mimetype)}`;
     await this.s3Service.upload(s3Key, file.buffer, file.mimetype);
 
-    const position = await this.prisma.productImage.count({
+    // MAX(position) + 1, not a count: a count collides with an existing
+    // sibling once any image has been deleted (e.g. delete position 0 out
+    // of [0,1,2] — two remain, count is 2, and the next upload would also
+    // land on 2).
+    const { _max } = await this.prisma.productImage.aggregate({
       where: { productId },
+      _max: { position: true },
     });
+    const position = (_max.position ?? -1) + 1;
     const image = await this.prisma.productImage.create({
       data: { productId, s3Key, position },
     });

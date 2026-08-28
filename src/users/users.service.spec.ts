@@ -1,8 +1,7 @@
-// `service` and `existingUser` below are scaffolding for the it.todo cases —
-// unused until those assertions are written in, not dead code.
-/* eslint-disable @typescript-eslint/no-unused-vars */
+import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdateCurrentUserRequestDto } from './dto/update-current-user-request.dto';
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
@@ -36,16 +35,64 @@ describe('UsersService', () => {
   });
 
   describe('findById', () => {
-    it.todo('throws NotFoundException when no user has that id');
+    it('throws NotFoundException when no user has that id', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
 
-    it.todo(
-      'returns a UserResponseDto without passwordHash for an existing user',
-    );
+      await expect(service.findById('missing-id')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns a UserResponseDto without passwordHash for an existing user', async () => {
+      prisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await service.findById(existingUser.id);
+
+      expect(result).not.toHaveProperty('passwordHash');
+      expect(result).toEqual({
+        id: existingUser.id,
+        email: existingUser.email,
+        firstName: existingUser.firstName,
+        lastName: existingUser.lastName,
+        role: existingUser.role,
+        passwordChangedAt: existingUser.passwordChangedAt,
+        createdAt: existingUser.createdAt,
+      });
+    });
   });
 
   describe('updateProfile', () => {
-    it.todo(
-      'updates only firstName/lastName and returns the updated UserResponseDto',
-    );
+    it('updates only firstName/lastName and returns the updated UserResponseDto', async () => {
+      const updated = {
+        ...existingUser,
+        firstName: 'Janet',
+        lastName: 'Smith',
+      };
+      prisma.user.update.mockResolvedValue(updated);
+      const dto: UpdateCurrentUserRequestDto = {
+        firstName: 'Janet',
+        lastName: 'Smith',
+      };
+
+      const result = await service.updateProfile(existingUser.id, dto);
+
+      // The DTO type has no `role`/`email` fields, so a request can't smuggle
+      // them in at compile time — this locks in that the Prisma call itself
+      // only ever receives the two updatable fields.
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: existingUser.id },
+        data: { firstName: 'Janet', lastName: 'Smith' },
+      });
+      expect(result).not.toHaveProperty('passwordHash');
+      expect(result).toEqual({
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        role: updated.role,
+        passwordChangedAt: updated.passwordChangedAt,
+        createdAt: updated.createdAt,
+      });
+    });
   });
 });

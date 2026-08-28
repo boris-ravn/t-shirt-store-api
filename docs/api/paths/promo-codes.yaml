@@ -1,0 +1,183 @@
+/v1/promo-codes:
+  post:
+    operationId: createPromoCode
+    summary: Create a promo code
+    description: Raises 409 `promo-code-taken` if `code` is already in use.
+    tags: [promo-codes]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/promo-code.yaml#/CreatePromoCodeRequest
+    responses:
+      "201":
+        description: Promo code created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/promo-code.yaml#/PromoCode
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  get:
+    operationId: listPromoCodes
+    summary: List promo codes
+    description: Manager only. `isActive` and `includeExpired` filter independently of each other.
+    tags: [promo-codes]
+    parameters:
+      - name: isActive
+        in: query
+        schema:
+          type: boolean
+      - name: includeExpired
+        in: query
+        schema:
+          type: boolean
+          default: false
+      - $ref: ../components/parameters.yaml#/LimitParam
+      - $ref: ../components/parameters.yaml#/OffsetParam
+    responses:
+      "200":
+        description: A page of promo codes.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: ../components/schemas/promo-code.yaml#/PromoCode
+                meta:
+                  $ref: ../components/schemas/common.yaml#/PaginationMeta
+              required:
+                - data
+                - meta
+              example:
+                data:
+                  - id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                    code: WELCOME15
+                    discount:
+                      type: percentage
+                      percent: 15
+                    minPurchaseAmount:
+                      amount: 2000
+                      currency: USD
+                    expiresAt: "2026-12-31T23:59:59Z"
+                    usageLimit: 500
+                    timesRedeemed: 37
+                    isActive: true
+                    createdAt: "2026-01-02T08:00:00Z"
+                    updatedAt: "2026-01-02T08:00:00Z"
+                meta:
+                  total: 1
+                  limit: 20
+                  offset: 0
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/promo-codes/{promoCodeId}:
+  get:
+    operationId: getPromoCode
+    summary: Get a promo code by id
+    description: Manager only — clients only ever interact with a promo code through `validatePromoCode`.
+    tags: [promo-codes]
+    parameters:
+      - $ref: ../components/parameters.yaml#/PromoCodeIdParam
+    responses:
+      "200":
+        description: The promo code.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/promo-code.yaml#/PromoCode
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  patch:
+    operationId: updatePromoCode
+    summary: Update a promo code
+    description: '`code` is not in this body — see `UpdatePromoCodeRequest`.'
+    tags: [promo-codes]
+    parameters:
+      - $ref: ../components/parameters.yaml#/PromoCodeIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/promo-code.yaml#/UpdatePromoCodeRequest
+    responses:
+      "200":
+        description: Promo code updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/promo-code.yaml#/PromoCode
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/promo-codes/validate:
+  post:
+    operationId: validatePromoCode
+    summary: Validate a promo code against the caller's cart
+    description: >
+      Checked against the caller's current cart. Reserves nothing —
+      `timesRedeemed` moves only at order creation, so a code that
+      validates here can still be exhausted by the time checkout runs. A
+      business rejection (bad, expired, exhausted, or below minimum) is
+      still a *successful* answer to the question asked, so it comes back
+      as 200 with `valid: false` and a `reason`, not a 409 — 409 here is
+      reserved for `cart-empty`, since an empty cart is not a promo-code
+      problem.
+    tags: [promo-codes]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/promo-code.yaml#/ValidatePromoCodeRequest
+    responses:
+      "200":
+        description: The validation result.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/promo-code.yaml#/PromoCodeValidation
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

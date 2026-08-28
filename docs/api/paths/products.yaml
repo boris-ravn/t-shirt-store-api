@@ -1,0 +1,353 @@
+/v1/products:
+  get:
+    operationId: listProducts
+    summary: List products
+    description: >
+      A client sees `Product` items scoped to `status = active AND deleted_at
+      IS NULL`; a manager sees `ProductAdmin` items scoped to all
+      non-deleted products, via `status` (manager-only — 403 for a client).
+      `sort=price` and the price-range filter require joining `skus`, and
+      are slower than the default sort.
+    tags: [products]
+    security: []
+    parameters:
+      - name: categoryId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        in: query
+        description: Matched against product name and description.
+        schema:
+          type: string
+      - name: minPrice
+        in: query
+        description: Minor units of the store currency.
+        schema:
+          type: integer
+          minimum: 0
+      - name: maxPrice
+        in: query
+        description: Minor units of the store currency.
+        schema:
+          type: integer
+          minimum: 0
+      - name: status
+        in: query
+        description: Manager only.
+        schema:
+          $ref: ../components/schemas/catalog.yaml#/ProductStatus
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+            - createdAt
+            - -createdAt
+            - price
+            - -price
+          default: -createdAt
+      - $ref: ../components/parameters.yaml#/LimitParam
+      - $ref: ../components/parameters.yaml#/OffsetParam
+    responses:
+      "200":
+        description: A page of products.
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: ../components/schemas/catalog.yaml#/Product
+                    meta:
+                      $ref: ../components/schemas/common.yaml#/PaginationMeta
+                  required:
+                    - data
+                    - meta
+                  example:
+                    data:
+                      - id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+                        categoryId: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+                        name: Classic Tee
+                        description: A 100% cotton crewneck t-shirt.
+                        images:
+                          - id: 6a1f2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d
+                            url: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+                            position: 0
+                            createdAt: "2026-01-10T09:05:00Z"
+                        skus:
+                          - id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+                            size: M
+                            color: black
+                            price:
+                              amount: 1999
+                              currency: USD
+                            availableQuantity: 42
+                        createdAt: "2026-01-10T09:00:00Z"
+                        updatedAt: "2026-01-10T09:00:00Z"
+                    meta:
+                      total: 1
+                      limit: 20
+                      offset: 0
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+                    meta:
+                      $ref: ../components/schemas/common.yaml#/PaginationMeta
+                  required:
+                    - data
+                    - meta
+                  example:
+                    data:
+                      - id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+                        categoryId: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+                        name: Classic Tee
+                        description: A 100% cotton crewneck t-shirt.
+                        status: active
+                        images:
+                          - id: 6a1f2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d
+                            url: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+                            position: 0
+                            createdAt: "2026-01-10T09:05:00Z"
+                        skus:
+                          - id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+                            size: M
+                            color: black
+                            price:
+                              amount: 1999
+                              currency: USD
+                            availableQuantity: 42
+                            skuCode: TEE-BLK-M
+                            stock: 50
+                            reservedStock: 8
+                            deletedAt: null
+                        createdAt: "2026-01-10T09:00:00Z"
+                        updatedAt: "2026-01-10T09:00:00Z"
+                    meta:
+                      total: 1
+                      limit: 20
+                      offset: 0
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  post:
+    operationId: createProduct
+    summary: Create a product
+    description: >
+      No SKUs and no images in the body — SKUs have their own guarded rules
+      and images are uploaded separately as multipart. Raises 404 if
+      `categoryId` does not reference an existing category.
+    tags: [products]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/CreateProductRequest
+    responses:
+      "201":
+        description: Product created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/products/{productId}:
+  get:
+    operationId: getProduct
+    summary: Get a product by id
+    description: >
+      A `disabled` product answers 404 for a client and 200 for a manager. A
+      soft-deleted product answers 404 for everyone. A client sees `Product`;
+      a manager sees `ProductAdmin`.
+    tags: [products]
+    security: []
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    responses:
+      "200":
+        description: The product.
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: ../components/schemas/catalog.yaml#/Product
+                - $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  patch:
+    operationId: updateProduct
+    summary: Update a product
+    description: Partial update — any field omitted from the body is left unchanged.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/UpdateProductRequest
+    responses:
+      "200":
+        description: Product updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductAdmin
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: deleteProduct
+    summary: Delete a product
+    description: >
+      Soft delete, sets `deletedAt`. Idempotent: a second call on an
+      already-deleted product answers 404, since it is invisible everywhere
+      after the first call.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    responses:
+      "204":
+        description: Product deleted.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/products/{productId}/images:
+  post:
+    operationId: uploadProductImage
+    summary: Upload a product image
+    description: >
+      `multipart/form-data` with one `file` part. Accepted types: `image/jpeg`,
+      `image/png`, `image/webp`. Maximum size: 5 MiB. Stored in AWS S3; the
+      client never talks to S3 directly.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              file:
+                type: string
+                format: binary
+            required:
+              - file
+            additionalProperties: false
+            example:
+              file: front.jpg
+    responses:
+      "201":
+        description: Image uploaded.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductImage
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "413":
+        $ref: ../components/responses.yaml#/PayloadTooLarge
+      "415":
+        $ref: ../components/responses.yaml#/UnsupportedMediaType
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/products/{productId}/images/{imageId}:
+  patch:
+    operationId: updateProductImage
+    summary: Reposition a product image
+    description: >
+      `position` only. Renumbering siblings is a service concern — this
+      contract only promises the image collection is returned in `position`
+      order.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+      - $ref: ../components/parameters.yaml#/ImageIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/UpdateProductImageRequest
+    responses:
+      "200":
+        description: Image updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/ProductImage
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: deleteProductImage
+    summary: Delete a product image
+    description: Hard delete — an image is never referenced by an order.
+    tags: [products]
+    parameters:
+      - $ref: ../components/parameters.yaml#/ProductIdParam
+      - $ref: ../components/parameters.yaml#/ImageIdParam
+    responses:
+      "204":
+        description: Image deleted.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

@@ -1,0 +1,74 @@
+LimitParam:
+  name: limit
+  in: query
+  description: Maximum number of items to return.
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+
+OffsetParam:
+  name: offset
+  in: query
+  description: Number of items to skip before collecting the result set.
+  schema:
+    type: integer
+    minimum: 0
+    default: 0
+
+CategoryIdParam:
+  name: categoryId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+ProductIdParam:
+  name: productId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+ImageIdParam:
+  name: imageId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+SkuIdParam:
+  name: skuId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+CartItemIdParam:
+  name: cartItemId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+OrderIdParam:
+  name: orderId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+PromoCodeIdParam:
+  name: promoCodeId
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid

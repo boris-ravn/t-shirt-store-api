@@ -1,0 +1,414 @@
+/v1/orders:
+  post:
+    operationId: createOrder
+    summary: Check out the caller's cart into an order
+    description: >
+      Creates the order `pending`, snapshots `order_items`, runs Reserve on
+      every SKU, reserves the promo code if one is given, and inserts the
+      initial `pending` row in the status history. Raises 409 `cart-empty`
+      if the cart has no items; `insufficient-stock` (with `skuId`,
+      `requested`, `available`) if a line's quantity exceeds what's
+      available; or one of `promo-code-invalid`, `promo-code-expired`,
+      `promo-code-exhausted`, `promo-minimum-not-met` if `promoCode` fails
+      validation.
+    tags: [orders]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/order.yaml#/CreateOrderRequest
+    responses:
+      "201":
+        description: Order created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/order.yaml#/Order
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  get:
+    operationId: listOrders
+    summary: List orders, scoped by the caller's role
+    description: >
+      A client sees only their own orders, as `Order`. A manager sees every
+      order, as `OrderAdmin` (adds the buyer and the promo code). A
+      delivery person sees orders in `shipped`, plus orders they personally
+      marked `delivered` — narrowing to `shipped` alone would make their own
+      delivery history unreadable, since a delivered order is no longer
+      `shipped`. `deliveredBy=me` is a delivery-person-only filter (403 for
+      anyone else).
+    tags: [orders]
+    parameters:
+      - name: status
+        in: query
+        style: form
+        explode: true
+        schema:
+          type: array
+          items:
+            $ref: ../components/schemas/order.yaml#/OrderStatus
+      - name: createdFrom
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: createdTo
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: minTotal
+        in: query
+        description: Minor units of the store currency.
+        schema:
+          type: integer
+          minimum: 0
+      - name: maxTotal
+        in: query
+        description: Minor units of the store currency.
+        schema:
+          type: integer
+          minimum: 0
+      - name: deliveredBy
+        in: query
+        description: Delivery person only. The only accepted value is `me`.
+        schema:
+          type: string
+          enum:
+            - me
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+            - createdAt
+            - -createdAt
+          default: -createdAt
+      - $ref: ../components/parameters.yaml#/LimitParam
+      - $ref: ../components/parameters.yaml#/OffsetParam
+    responses:
+      "200":
+        description: A page of orders.
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: ../components/schemas/order.yaml#/Order
+                    meta:
+                      $ref: ../components/schemas/common.yaml#/PaginationMeta
+                  required:
+                    - data
+                    - meta
+                  example:
+                    data:
+                      - id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+                        status: paid
+                        items:
+                          - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                            productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+                            skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+                            productName: Classic Tee
+                            size: M
+                            color: black
+                            quantity: 2
+                            unitPrice:
+                              amount: 1999
+                              currency: USD
+                        subtotal:
+                          amount: 3998
+                          currency: USD
+                        discountAmount:
+                          amount: 300
+                          currency: USD
+                        total:
+                          amount: 3698
+                          currency: USD
+                        shippingDetails: null
+                        createdAt: "2026-01-12T10:45:00Z"
+                        updatedAt: "2026-01-12T11:00:00Z"
+                    meta:
+                      total: 1
+                      limit: 20
+                      offset: 0
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: ../components/schemas/order.yaml#/OrderAdmin
+                    meta:
+                      $ref: ../components/schemas/common.yaml#/PaginationMeta
+                  required:
+                    - data
+                    - meta
+                  example:
+                    data:
+                      - id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+                        status: paid
+                        items:
+                          - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                            productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+                            skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+                            productName: Classic Tee
+                            size: M
+                            color: black
+                            quantity: 2
+                            unitPrice:
+                              amount: 1999
+                              currency: USD
+                        subtotal:
+                          amount: 3998
+                          currency: USD
+                        discountAmount:
+                          amount: 300
+                          currency: USD
+                        total:
+                          amount: 3698
+                          currency: USD
+                        shippingDetails: null
+                        createdAt: "2026-01-12T10:45:00Z"
+                        updatedAt: "2026-01-12T11:00:00Z"
+                        user:
+                          id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+                          email: jane.doe@example.com
+                          firstName: Jane
+                          lastName: Doe
+                        promoCode:
+                          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                          code: WELCOME15
+                    meta:
+                      total: 1
+                      limit: 20
+                      offset: 0
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/orders/{orderId}:
+  get:
+    operationId: getOrder
+    summary: Get an order by id
+    description: >
+      404, not 403, when a client asks for another client's order — its
+      existence is not disclosed. A client or a delivery person sees
+      `Order`; a manager sees `OrderAdmin`.
+    tags: [orders]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+    responses:
+      "200":
+        description: The order.
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: ../components/schemas/order.yaml#/Order
+                - $ref: ../components/schemas/order.yaml#/OrderAdmin
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/orders/{orderId}/cancel:
+  post:
+    operationId: cancelOrder
+    summary: Cancel an order
+    description: >
+      Allowed while `pending`, `paid` or `processing`; raises 409
+      `invalid-status-transition` (with `from`, `to`, `allowed`) from
+      `shipped`, `delivered` or `cancelled`. Triggers Release or Restock
+      depending on the order's previous status read under lock, plus a
+      Release on the promo code if one was applied. Callable by the order's
+      own client, or by a manager — the only transition with two distinct
+      caller roles, so like `getOrder` it returns `Order` to the client and
+      `OrderAdmin` to the manager.
+    tags: [orders]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+    responses:
+      "200":
+        description: Order cancelled.
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: ../components/schemas/order.yaml#/Order
+                - $ref: ../components/schemas/order.yaml#/OrderAdmin
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/orders/{orderId}/process:
+  post:
+    operationId: processOrder
+    summary: Advance an order from paid to processing
+    description: >
+      `paid → processing`. Raises 409 `invalid-status-transition` (with
+      `from`, `to`, `allowed`) from any other status. Manager only — returns
+      `OrderAdmin`, since every caller who can reach this operation already
+      gets that view from `listOrders`/`getOrder`.
+    tags: [orders]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+    responses:
+      "200":
+        description: Order advanced to processing.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/order.yaml#/OrderAdmin
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/orders/{orderId}/ship:
+  post:
+    operationId: shipOrder
+    summary: Advance an order from processing to shipped
+    description: >
+      `processing → shipped`. Raises 409 `invalid-status-transition` (with
+      `from`, `to`, `allowed`) from any other status. Manager only — returns
+      `OrderAdmin`, since every caller who can reach this operation already
+      gets that view from `listOrders`/`getOrder`.
+    tags: [orders]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+    responses:
+      "200":
+        description: Order advanced to shipped.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/order.yaml#/OrderAdmin
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/orders/{orderId}/deliver:
+  post:
+    operationId: deliverOrder
+    summary: Mark a shipped order delivered
+    description: >
+      `shipped → delivered`. Raises 409 `invalid-status-transition` (with
+      `from`, `to`, `allowed`) from any other status. Any delivery person
+      may act on any `shipped` order — the data model has no per-order
+      assignment, by design.
+    tags: [orders]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+    responses:
+      "200":
+        description: Order marked delivered.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/order.yaml#/Order
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/orders/{orderId}/status-history:
+  get:
+    operationId: listOrderStatusHistory
+    summary: List an order's status history
+    description: >
+      Paginated even though it is bounded — the envelope is the same on
+      every collection endpoint, with no row-count exception. Ordered
+      ascending by `createdAt` (oldest first): `order_status_history.created_at`
+      uses `clock_timestamp()` specifically so this sequence is meaningful,
+      and a history reads naturally in the order it happened.
+    tags: [orders]
+    parameters:
+      - $ref: ../components/parameters.yaml#/OrderIdParam
+      - $ref: ../components/parameters.yaml#/LimitParam
+      - $ref: ../components/parameters.yaml#/OffsetParam
+    responses:
+      "200":
+        description: A page of status changes, oldest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: ../components/schemas/order.yaml#/OrderStatusChange
+                meta:
+                  $ref: ../components/schemas/common.yaml#/PaginationMeta
+              required:
+                - data
+                - meta
+              example:
+                data:
+                  - id: 9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b
+                    status: pending
+                    changedBy: null
+                    createdAt: "2026-01-12T10:45:00Z"
+                  - id: a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                    status: paid
+                    changedBy: null
+                    createdAt: "2026-01-12T11:00:00Z"
+                meta:
+                  total: 2
+                  limit: 20
+                  offset: 0
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

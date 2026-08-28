@@ -1,0 +1,147 @@
+/v1/categories:
+  get:
+    operationId: listCategories
+    summary: List categories
+    description: Every category, client and manager alike — there is no active/disabled distinction at the category level.
+    tags: [categories]
+    security: []
+    parameters:
+      - $ref: ../components/parameters.yaml#/LimitParam
+      - $ref: ../components/parameters.yaml#/OffsetParam
+    responses:
+      "200":
+        description: A page of categories.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: ../components/schemas/catalog.yaml#/Category
+                meta:
+                  $ref: ../components/schemas/common.yaml#/PaginationMeta
+              required:
+                - data
+                - meta
+              example:
+                data:
+                  - id: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+                    name: T-Shirts
+                    slug: t-shirts
+                    createdAt: "2026-01-10T09:00:00Z"
+                    updatedAt: "2026-01-10T09:00:00Z"
+                meta:
+                  total: 4
+                  limit: 20
+                  offset: 0
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  post:
+    operationId: createCategory
+    summary: Create a category
+    description: Raises 409 `category-name-taken` when `name` or `slug` is already in use.
+    tags: [categories]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/CreateCategoryRequest
+    responses:
+      "201":
+        description: Category created.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/Category
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+
+/v1/categories/{categoryId}:
+  get:
+    operationId: getCategory
+    summary: Get a category by id
+    description: Returns the category regardless of whether it currently has any products.
+    tags: [categories]
+    security: []
+    parameters:
+      - $ref: ../components/parameters.yaml#/CategoryIdParam
+    responses:
+      "200":
+        description: The category.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/Category
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  patch:
+    operationId: updateCategory
+    summary: Update a category
+    description: Raises 409 `category-name-taken` when `name` or `slug` is already in use.
+    tags: [categories]
+    parameters:
+      - $ref: ../components/parameters.yaml#/CategoryIdParam
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/catalog.yaml#/UpdateCategoryRequest
+    responses:
+      "200":
+        description: Category updated.
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas/catalog.yaml#/Category
+      "400":
+        $ref: ../components/responses.yaml#/BadRequest
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError
+  delete:
+    operationId: deleteCategory
+    summary: Delete a category
+    description: >
+      Hard delete. Raises 409 `category-not-empty` (with a `productCount`
+      extension member) if any product still references this category —
+      `products.category_id` is `NOT NULL`, so this is the deliberate
+      contract for that FK conflict, not a 500.
+    tags: [categories]
+    parameters:
+      - $ref: ../components/parameters.yaml#/CategoryIdParam
+    responses:
+      "204":
+        description: Category deleted.
+      "401":
+        $ref: ../components/responses.yaml#/Unauthorized
+      "403":
+        $ref: ../components/responses.yaml#/Forbidden
+      "404":
+        $ref: ../components/responses.yaml#/NotFound
+      "409":
+        $ref: ../components/responses.yaml#/Conflict
+      "500":
+        $ref: ../components/responses.yaml#/InternalServerError

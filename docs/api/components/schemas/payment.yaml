@@ -1,0 +1,80 @@
+PaymentIntentSession:
+  type: object
+  properties:
+    paymentId:
+      type: string
+      format: uuid
+    clientSecret:
+      type: string
+    amount:
+      $ref: ./common.yaml#/Money
+  required:
+    - paymentId
+    - clientSecret
+    - amount
+  example:
+    paymentId: 0d1e2f3a-4b5c-4d6e-8f7a-8b9c0d1e2f3a
+    clientSecret: pi_3P1abcXYZ_secret_9f8e7d6c5b4a
+    amount:
+      amount: 3698
+      currency: USD
+
+PaymentLinkCheckout:
+  type: object
+  description: >
+    A 201 here is not a promise of availability — Payment Links never
+    reserve stock ahead of the charge.
+  properties:
+    order:
+      $ref: ./order.yaml#/Order
+    checkoutUrl:
+      type: string
+      format: uri
+  required:
+    - order
+    - checkoutUrl
+  example:
+    order:
+      id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+      status: pending
+      items:
+        - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+          productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+          skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+          productName: Classic Tee
+          size: M
+          color: black
+          quantity: 1
+          unitPrice:
+            amount: 1999
+            currency: USD
+      subtotal:
+        amount: 1999
+        currency: USD
+      discountAmount:
+        amount: 0
+        currency: USD
+      total:
+        amount: 1999
+        currency: USD
+      shippingDetails: null
+      createdAt: "2026-01-12T10:45:00Z"
+      updatedAt: "2026-01-12T10:45:00Z"
+    checkoutUrl: https://buy.stripe.com/test_abc123
+
+CreatePaymentLinkCheckoutRequest:
+  type: object
+  properties:
+    skuId:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+  required:
+    - skuId
+    - quantity
+  additionalProperties: false
+  example:
+    skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    quantity: 1

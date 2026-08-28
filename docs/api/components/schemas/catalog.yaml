@@ -1,0 +1,424 @@
+Category:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    slug:
+      type: string
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - name
+    - slug
+    - createdAt
+    - updatedAt
+  example:
+    id: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+    name: T-Shirts
+    slug: t-shirts
+    createdAt: "2026-01-10T09:00:00Z"
+    updatedAt: "2026-01-10T09:00:00Z"
+
+CreateCategoryRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    slug:
+      type: string
+  required:
+    - name
+    - slug
+  additionalProperties: false
+  example:
+    name: T-Shirts
+    slug: t-shirts
+
+UpdateCategoryRequest:
+  type: object
+  properties:
+    name:
+      type: string
+    slug:
+      type: string
+  additionalProperties: false
+  example:
+    name: T-Shirts & Tanks
+
+ProductImage:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    url:
+      type: string
+      format: uri
+      description: Built at response time from the S3 object key, not stored as a URL.
+    position:
+      type: integer
+      minimum: 0
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - url
+    - position
+    - createdAt
+  example:
+    id: 6a1f2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d
+    url: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+    position: 0
+    createdAt: "2026-01-10T09:05:00Z"
+
+UpdateProductImageRequest:
+  type: object
+  properties:
+    position:
+      type: integer
+      minimum: 0
+  required:
+    - position
+  additionalProperties: false
+  example:
+    position: 1
+
+ProductStatus:
+  type: string
+  enum:
+    - active
+    - disabled
+  example: active
+
+Sku:
+  type: object
+  description: Client-facing SKU. Raw stock counters are not exposed — see SkuAdmin.
+  properties:
+    id:
+      type: string
+      format: uuid
+    size:
+      type: string
+    color:
+      type: string
+    price:
+      $ref: ./common.yaml#/Money
+    availableQuantity:
+      type: integer
+      minimum: 0
+      description: Derived as `stock - reservedStock`. No column behind it.
+  required:
+    - id
+    - size
+    - color
+    - price
+    - availableQuantity
+  example:
+    id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    size: M
+    color: black
+    price:
+      amount: 1999
+      currency: USD
+    availableQuantity: 42
+
+SkuAdmin:
+  allOf:
+    - $ref: '#/Sku'
+    - type: object
+      properties:
+        skuCode:
+          type: string
+        stock:
+          type: integer
+          minimum: 0
+          description: Units physically held, decremented on successful payment.
+        reservedStock:
+          type: integer
+          minimum: 0
+          description: Held by pending cart orders.
+        deletedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+      required:
+        - skuCode
+        - stock
+        - reservedStock
+        - deletedAt
+      example:
+        skuCode: TEE-BLK-M
+        stock: 50
+        reservedStock: 8
+        deletedAt: null
+  example:
+    id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    size: M
+    color: black
+    price:
+      amount: 1999
+      currency: USD
+    availableQuantity: 42
+    skuCode: TEE-BLK-M
+    stock: 50
+    reservedStock: 8
+    deletedAt: null
+
+CreateSkuRequest:
+  type: object
+  properties:
+    productId:
+      type: string
+      format: uuid
+    skuCode:
+      type: string
+    size:
+      type: string
+    color:
+      type: string
+    price:
+      $ref: ./common.yaml#/Money
+    stock:
+      type: integer
+      minimum: 0
+  required:
+    - productId
+    - skuCode
+    - size
+    - color
+    - price
+    - stock
+  additionalProperties: false
+  example:
+    productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+    skuCode: TEE-BLK-M
+    size: M
+    color: black
+    price:
+      amount: 1999
+      currency: USD
+    stock: 50
+
+UpdateSkuRequest:
+  type: object
+  description: '`stock` is deliberately absent — see `restockSku` for the only supported write to it.'
+  properties:
+    skuCode:
+      type: string
+    size:
+      type: string
+    color:
+      type: string
+    price:
+      $ref: ./common.yaml#/Money
+  additionalProperties: false
+  example:
+    price:
+      amount: 2299
+      currency: USD
+
+RestockSkuRequest:
+  type: object
+  properties:
+    quantity:
+      type: integer
+      minimum: 1
+      description: A delta added to `stock`, not an absolute value.
+  required:
+    - quantity
+  additionalProperties: false
+  example:
+    quantity: 25
+
+ProductBase:
+  type: object
+  description: Fields shared by `Product` and `ProductAdmin`.
+  properties:
+    id:
+      type: string
+      format: uuid
+    categoryId:
+      type: string
+      format: uuid
+    name:
+      type: string
+    description:
+      type:
+        - string
+        - 'null'
+    images:
+      type: array
+      items:
+        $ref: '#/ProductImage'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - categoryId
+    - name
+    - description
+    - images
+    - createdAt
+    - updatedAt
+  example:
+    id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+    categoryId: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+    name: Classic Tee
+    description: A 100% cotton crewneck t-shirt.
+    images:
+      - id: 6a1f2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d
+        url: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+        position: 0
+        createdAt: "2026-01-10T09:05:00Z"
+    createdAt: "2026-01-10T09:00:00Z"
+    updatedAt: "2026-01-10T09:00:00Z"
+
+Product:
+  description: Client-facing product. Always active and not soft-deleted.
+  allOf:
+    - $ref: '#/ProductBase'
+    - type: object
+      properties:
+        skus:
+          type: array
+          items:
+            $ref: '#/Sku'
+      required:
+        - skus
+      example:
+        skus:
+          - id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+            size: M
+            color: black
+            price:
+              amount: 1999
+              currency: USD
+            availableQuantity: 42
+  example:
+    id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+    categoryId: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+    name: Classic Tee
+    description: A 100% cotton crewneck t-shirt.
+    images:
+      - id: 6a1f2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d
+        url: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+        position: 0
+        createdAt: "2026-01-10T09:05:00Z"
+    skus:
+      - id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+        size: M
+        color: black
+        price:
+          amount: 1999
+          currency: USD
+        availableQuantity: 42
+    createdAt: "2026-01-10T09:00:00Z"
+    updatedAt: "2026-01-10T09:00:00Z"
+
+ProductAdmin:
+  allOf:
+    - $ref: '#/ProductBase'
+    - type: object
+      properties:
+        status:
+          $ref: '#/ProductStatus'
+        skus:
+          type: array
+          items:
+            $ref: '#/SkuAdmin'
+      required:
+        - status
+        - skus
+      example:
+        status: active
+        skus:
+          - id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+            size: M
+            color: black
+            price:
+              amount: 1999
+              currency: USD
+            availableQuantity: 42
+            skuCode: TEE-BLK-M
+            stock: 50
+            reservedStock: 8
+            deletedAt: null
+  example:
+    id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+    categoryId: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+    name: Classic Tee
+    description: A 100% cotton crewneck t-shirt.
+    status: active
+    images:
+      - id: 6a1f2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d
+        url: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+        position: 0
+        createdAt: "2026-01-10T09:05:00Z"
+    skus:
+      - id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+        size: M
+        color: black
+        price:
+          amount: 1999
+          currency: USD
+        availableQuantity: 42
+        skuCode: TEE-BLK-M
+        stock: 50
+        reservedStock: 8
+        deletedAt: null
+    createdAt: "2026-01-10T09:00:00Z"
+    updatedAt: "2026-01-10T09:00:00Z"
+
+CreateProductRequest:
+  type: object
+  properties:
+    categoryId:
+      type: string
+      format: uuid
+    name:
+      type: string
+    description:
+      type: string
+  required:
+    - categoryId
+    - name
+  additionalProperties: false
+  example:
+    categoryId: 1e3e6e2a-4b8e-4a2b-9c1a-2f6f8b1a1a11
+    name: Classic Tee
+    description: A 100% cotton crewneck t-shirt.
+
+UpdateProductRequest:
+  type: object
+  description: >
+    Writing `status` is the "disable" capability — there is no separate
+    endpoint for it.
+  properties:
+    name:
+      type: string
+    description:
+      type:
+        - string
+        - 'null'
+    categoryId:
+      type: string
+      format: uuid
+    status:
+      $ref: '#/ProductStatus'
+  additionalProperties: false
+  example:
+    status: disabled

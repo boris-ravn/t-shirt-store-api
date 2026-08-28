@@ -1,0 +1,128 @@
+openapi: 3.1.0
+
+info:
+  title: T-Shirt Store API
+  version: 1.0.0
+  description: >
+    REST API for a T-shirt store: catalog with variants, cart, orders with a
+    status lifecycle, Stripe payments in two flavours, and a queue-backed
+    stock notification. See docs/api/CONVENTIONS.md for the rules this
+    contract follows and docs/database/README.md for the data model behind
+    it.
+
+
+    **Roles.** `client` — browses the catalog, likes products, manages a
+    cart, places and tracks their own orders. `manager` — owns the catalog,
+    SKUs, promo codes, and the order lifecycle (`process`, `ship`); sees
+    every order. `delivery_person` — marks a `shipped` order `delivered`; no
+    per-order assignment, any delivery person may act on any `shipped`
+    order. Product browsing (`listProducts`, `getProduct`, `listCategories`,
+    `getCategory`) and the Stripe webhook are the only public operations;
+    everything else requires a role.
+  contact:
+    name: T-Shirt Store API Support
+    email: api-support@tshirt-store.example
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: ./components/security-schemes.yaml#/bearerAuth
+
+tags:
+  - name: auth
+    description: Sign up / in / out, refresh tokens, forgot and reset password.
+  - name: users
+    description: The authenticated caller's own profile.
+  - name: categories
+    description: Product categories.
+  - name: products
+    description: Products and their images.
+  - name: skus
+    description: Product variants (size, color, price, stock).
+  - name: likes
+    description: Client product likes, feeding the stock notification set.
+  - name: cart
+    description: The caller's own cart and its items.
+  - name: orders
+    description: Orders, their status lifecycle, and status history.
+  - name: payments
+    description: Stripe payment intents, payment-link checkout, and webhooks.
+  - name: promo-codes
+    description: Promo code management and validation.
+
+paths:
+  /v1/auth/sign-up:
+    $ref: ./paths/auth.yaml#/~1v1~1auth~1sign-up
+  /v1/auth/sign-in:
+    $ref: ./paths/auth.yaml#/~1v1~1auth~1sign-in
+  /v1/auth/refresh:
+    $ref: ./paths/auth.yaml#/~1v1~1auth~1refresh
+  /v1/auth/sign-out:
+    $ref: ./paths/auth.yaml#/~1v1~1auth~1sign-out
+  /v1/auth/forgot-password:
+    $ref: ./paths/auth.yaml#/~1v1~1auth~1forgot-password
+  /v1/auth/reset-password:
+    $ref: ./paths/auth.yaml#/~1v1~1auth~1reset-password
+  /v1/users/me:
+    $ref: ./paths/users.yaml#/~1v1~1users~1me
+  /v1/categories:
+    $ref: ./paths/categories.yaml#/~1v1~1categories
+  /v1/categories/{categoryId}:
+    $ref: ./paths/categories.yaml#/~1v1~1categories~1{categoryId}
+  /v1/products:
+    $ref: ./paths/products.yaml#/~1v1~1products
+  /v1/products/{productId}:
+    $ref: ./paths/products.yaml#/~1v1~1products~1{productId}
+  /v1/products/{productId}/images:
+    $ref: ./paths/products.yaml#/~1v1~1products~1{productId}~1images
+  /v1/products/{productId}/images/{imageId}:
+    $ref: ./paths/products.yaml#/~1v1~1products~1{productId}~1images~1{imageId}
+  /v1/skus:
+    $ref: ./paths/skus.yaml#/~1v1~1skus
+  /v1/skus/{skuId}:
+    $ref: ./paths/skus.yaml#/~1v1~1skus~1{skuId}
+  /v1/skus/{skuId}/restock:
+    $ref: ./paths/skus.yaml#/~1v1~1skus~1{skuId}~1restock
+  /v1/products/{productId}/like:
+    $ref: ./paths/likes.yaml#/~1v1~1products~1{productId}~1like
+  /v1/users/me/likes:
+    $ref: ./paths/likes.yaml#/~1v1~1users~1me~1likes
+  /v1/cart:
+    $ref: ./paths/cart.yaml#/~1v1~1cart
+  /v1/cart/items:
+    $ref: ./paths/cart.yaml#/~1v1~1cart~1items
+  /v1/cart/items/{cartItemId}:
+    $ref: ./paths/cart.yaml#/~1v1~1cart~1items~1{cartItemId}
+  /v1/promo-codes:
+    $ref: ./paths/promo-codes.yaml#/~1v1~1promo-codes
+  /v1/promo-codes/{promoCodeId}:
+    $ref: ./paths/promo-codes.yaml#/~1v1~1promo-codes~1{promoCodeId}
+  /v1/promo-codes/validate:
+    $ref: ./paths/promo-codes.yaml#/~1v1~1promo-codes~1validate
+  /v1/orders:
+    $ref: ./paths/orders.yaml#/~1v1~1orders
+  /v1/orders/{orderId}:
+    $ref: ./paths/orders.yaml#/~1v1~1orders~1{orderId}
+  /v1/orders/{orderId}/cancel:
+    $ref: ./paths/orders.yaml#/~1v1~1orders~1{orderId}~1cancel
+  /v1/orders/{orderId}/process:
+    $ref: ./paths/orders.yaml#/~1v1~1orders~1{orderId}~1process
+  /v1/orders/{orderId}/ship:
+    $ref: ./paths/orders.yaml#/~1v1~1orders~1{orderId}~1ship
+  /v1/orders/{orderId}/deliver:
+    $ref: ./paths/orders.yaml#/~1v1~1orders~1{orderId}~1deliver
+  /v1/orders/{orderId}/status-history:
+    $ref: ./paths/orders.yaml#/~1v1~1orders~1{orderId}~1status-history
+  /v1/orders/{orderId}/payment-intent:
+    $ref: ./paths/payments.yaml#/~1v1~1orders~1{orderId}~1payment-intent
+  /v1/checkout/payment-link:
+    $ref: ./paths/payments.yaml#/~1v1~1checkout~1payment-link
+  /v1/webhooks/stripe:
+    $ref: ./paths/payments.yaml#/~1v1~1webhooks~1stripe

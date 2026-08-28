@@ -1,0 +1,147 @@
+CartItem:
+  type: object
+  description: >
+    Every price here is read live from the SKU, not snapshotted — a cart's
+    subtotal can legitimately change between two reads.
+  properties:
+    id:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+    lineTotal:
+      $ref: ./common.yaml#/Money
+    availableQuantity:
+      type: integer
+      minimum: 0
+      description: From the line's SKU. Lets a client flag a line as unpurchasable before checkout fails.
+    sku:
+      $ref: ./catalog.yaml#/Sku
+    product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        imageUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+      required:
+        - id
+        - name
+        - imageUrl
+      example:
+        id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+        name: Classic Tee
+        imageUrl: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+  required:
+    - id
+    - quantity
+    - lineTotal
+    - availableQuantity
+    - sku
+    - product
+  example:
+    id: 5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f
+    quantity: 2
+    lineTotal:
+      amount: 3998
+      currency: USD
+    availableQuantity: 42
+    sku:
+      id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+      size: M
+      color: black
+      price:
+        amount: 1999
+        currency: USD
+      availableQuantity: 42
+    product:
+      id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+      name: Classic Tee
+      imageUrl: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+
+AddCartItemRequest:
+  type: object
+  description: >
+    No stock check here — reservation happens at order creation, inside the
+    same transaction as the guarded stock `UPDATE`.
+  properties:
+    skuId:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+  required:
+    - skuId
+    - quantity
+  additionalProperties: false
+  example:
+    skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    quantity: 2
+
+UpdateCartItemRequest:
+  type: object
+  description: 'Absolute, not a delta. `quantity: 0` is a validation failure — deletion has its own verb.'
+  properties:
+    quantity:
+      type: integer
+      minimum: 1
+  required:
+    - quantity
+  additionalProperties: false
+  example:
+    quantity: 3
+
+Cart:
+  type: object
+  description: Created on first read if the caller has none. `items` is a plain array, not a paginated collection.
+  properties:
+    id:
+      type: string
+      format: uuid
+    items:
+      type: array
+      items:
+        $ref: '#/CartItem'
+    subtotal:
+      $ref: ./common.yaml#/Money
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - items
+    - subtotal
+    - updatedAt
+  example:
+    id: 4c5d6e7f-8a9b-4c0d-8e1f-2a3b4c5d6e7f
+    items:
+      - id: 5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f
+        quantity: 2
+        lineTotal:
+          amount: 3998
+          currency: USD
+        availableQuantity: 42
+        sku:
+          id: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+          size: M
+          color: black
+          price:
+            amount: 1999
+            currency: USD
+          availableQuantity: 42
+        product:
+          id: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+          name: Classic Tee
+          imageUrl: https://cdn.tshirt-store.example/products/classic-tee/front.jpg
+    subtotal:
+      amount: 3998
+      currency: USD
+    updatedAt: "2026-01-12T10:15:00Z"

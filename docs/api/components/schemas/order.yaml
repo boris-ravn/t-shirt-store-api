@@ -1,0 +1,324 @@
+OrderStatus:
+  type: string
+  enum:
+    - pending
+    - paid
+    - processing
+    - shipped
+    - delivered
+    - cancelled
+  example: paid
+
+CreateOrderRequest:
+  type: object
+  description: Checks out the caller's own cart — there is no items field, since the order is built from it.
+  properties:
+    promoCode:
+      type: string
+  additionalProperties: false
+  example:
+    promoCode: WELCOME15
+
+OrderItem:
+  type: object
+  description: A snapshot at purchase time — never re-resolved through products or skus.
+  properties:
+    id:
+      type: string
+      format: uuid
+    productId:
+      type: string
+      format: uuid
+    skuId:
+      type: string
+      format: uuid
+    productName:
+      type: string
+    size:
+      type: string
+    color:
+      type: string
+    quantity:
+      type: integer
+      minimum: 1
+    unitPrice:
+      $ref: ./common.yaml#/Money
+  required:
+    - id
+    - productId
+    - skuId
+    - productName
+    - size
+    - color
+    - quantity
+    - unitPrice
+  example:
+    id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+    productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+    skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+    productName: Classic Tee
+    size: M
+    color: black
+    quantity: 2
+    unitPrice:
+      amount: 1999
+      currency: USD
+
+OrderShippingDetails:
+  type: object
+  description: Snapshotted from the successful-payment webhook. No row exists until then.
+  properties:
+    recipientName:
+      type: string
+    phone:
+      type:
+        - string
+        - 'null'
+    line1:
+      type: string
+    line2:
+      type:
+        - string
+        - 'null'
+    city:
+      type: string
+    state:
+      type:
+        - string
+        - 'null'
+    postalCode:
+      type: string
+    country:
+      type: string
+      pattern: ^[A-Z]{2}$
+      description: ISO 3166-1 alpha-2.
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - recipientName
+    - phone
+    - line1
+    - line2
+    - city
+    - state
+    - postalCode
+    - country
+    - createdAt
+  example:
+    recipientName: Jane Doe
+    phone: "+1-555-0100"
+    line1: 123 Main St
+    line2: null
+    city: Springfield
+    state: IL
+    postalCode: "62704"
+    country: US
+    createdAt: "2026-01-12T11:00:00Z"
+
+OrderStatusChange:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    status:
+      $ref: '#/OrderStatus'
+    changedBy:
+      type:
+        - string
+        - 'null'
+      format: uuid
+      description: Null when the transition was triggered by a webhook rather than a person.
+    createdAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - status
+    - changedBy
+    - createdAt
+  example:
+    id: 9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b
+    status: paid
+    changedBy: null
+    createdAt: "2026-01-12T11:00:00Z"
+
+Order:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    status:
+      $ref: '#/OrderStatus'
+    items:
+      type: array
+      items:
+        $ref: '#/OrderItem'
+    subtotal:
+      $ref: ./common.yaml#/Money
+    discountAmount:
+      $ref: ./common.yaml#/Money
+    total:
+      $ref: ./common.yaml#/Money
+    shippingDetails:
+      oneOf:
+        - $ref: '#/OrderShippingDetails'
+        - type: 'null'
+      description: Null on an unpaid order.
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  required:
+    - id
+    - status
+    - items
+    - subtotal
+    - discountAmount
+    - total
+    - shippingDetails
+    - createdAt
+    - updatedAt
+  example:
+    id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+    status: paid
+    items:
+      - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+        skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+        productName: Classic Tee
+        size: M
+        color: black
+        quantity: 2
+        unitPrice:
+          amount: 1999
+          currency: USD
+    subtotal:
+      amount: 3998
+      currency: USD
+    discountAmount:
+      amount: 300
+      currency: USD
+    total:
+      amount: 3698
+      currency: USD
+    shippingDetails:
+      recipientName: Jane Doe
+      phone: "+1-555-0100"
+      line1: 123 Main St
+      line2: null
+      city: Springfield
+      state: IL
+      postalCode: "62704"
+      country: US
+      createdAt: "2026-01-12T11:00:00Z"
+    createdAt: "2026-01-12T10:45:00Z"
+    updatedAt: "2026-01-12T11:00:00Z"
+
+OrderAdmin:
+  allOf:
+    - $ref: '#/Order'
+    - type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            firstName:
+              type: string
+            lastName:
+              type: string
+          required:
+            - id
+            - email
+            - firstName
+            - lastName
+          example:
+            id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+            email: jane.doe@example.com
+            firstName: Jane
+            lastName: Doe
+        promoCode:
+          description: >
+            Joined through `promoCodeId`, correct only because `code` is
+            treated as immutable after creation.
+          oneOf:
+            - type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+              required:
+                - id
+                - code
+              additionalProperties: false
+              example:
+                id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                code: WELCOME15
+            - type: 'null'
+      required:
+        - user
+        - promoCode
+      example:
+        user:
+          id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+          email: jane.doe@example.com
+          firstName: Jane
+          lastName: Doe
+        promoCode:
+          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+          code: WELCOME15
+  example:
+    id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
+    status: paid
+    items:
+      - id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        productId: 8f14e45f-ceea-467e-bd97-37a58c1a5e4b
+        skuId: 3b1f2e8a-6c2d-4e2a-9f3b-1a2b3c4d5e6f
+        productName: Classic Tee
+        size: M
+        color: black
+        quantity: 2
+        unitPrice:
+          amount: 1999
+          currency: USD
+    subtotal:
+      amount: 3998
+      currency: USD
+    discountAmount:
+      amount: 300
+      currency: USD
+    total:
+      amount: 3698
+      currency: USD
+    shippingDetails:
+      recipientName: Jane Doe
+      phone: "+1-555-0100"
+      line1: 123 Main St
+      line2: null
+      city: Springfield
+      state: IL
+      postalCode: "62704"
+      country: US
+      createdAt: "2026-01-12T11:00:00Z"
+    createdAt: "2026-01-12T10:45:00Z"
+    updatedAt: "2026-01-12T11:00:00Z"
+    user:
+      id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
+      email: jane.doe@example.com
+      firstName: Jane
+      lastName: Doe
+    promoCode:
+      id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+      code: WELCOME15

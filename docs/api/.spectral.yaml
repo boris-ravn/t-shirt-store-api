@@ -1,0 +1,169 @@
+# House ruleset for the T-Shirt Store API contract, on top of spectral:oas.
+#
+# The point is not catching malformed YAML — spectral:oas already does that —
+# it is enforcing the conventions this project actually cares about, per
+# docs/api/CONVENTIONS.md.
+#
+# Operation objects are addressed with a plain JSONPath method-list, not the
+# built-in `#OperationObject` alias: that alias did not resolve when referenced
+# from a ruleset that only `extends` spectral:oas (verified empirically —
+# "Alias \"OperationObject\" does not exist" — against spectral-core's
+# alias merger, which only combines `aliases` maps when both the base and the
+# extending ruleset declare one; this ruleset declares none).
+
+extends:
+  - spectral:oas
+
+rules:
+  # --- Built-in rules, raised to the severity this project needs.
+  # Partial overrides of an extended rule take a bare severity value, not an
+  # object — an object is parsed as a full rule definition, which then fails
+  # for missing "given"/"then" (verified empirically).
+
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-tags: error
+
+  # oas3-schema false-positives on any externally-$ref'd path item or
+  # operation ("... property must not have unevaluated properties"),
+  # verified against Redocly lint on the same document, which reports the
+  # structure valid. Since every path in this contract is external-$ref'd
+  # by design, this would be one guaranteed false error per operation.
+  # Redocly lint (run alongside Spectral) is the base-schema-validity check
+  # instead; Spectral stays scoped to the conventions above.
+  oas3-schema: off
+
+  # --- House rules ---
+
+  operation-summary:
+    description: Every operation has a summary.
+    message: "Operation must have a non-empty \"summary\"."
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,options,head,trace]"
+    then:
+      field: summary
+      function: truthy
+
+  operation-has-500:
+    description: Every operation declares 500, so the shape is documented even for the unhandled case.
+    message: "Operation must declare a 500 response."
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,options,head,trace].responses"
+    then:
+      field: "500"
+      function: truthy
+
+  operation-declares-401:
+    description: Every operation that isn't explicitly public (`security: []`) declares 401.
+    message: "Non-public operation must declare a 401 response."
+    severity: error
+    # A two-step "[method-list][?(filter)]" chain filters each operation's
+    # own children (operationId, summary, ...), not the operation object
+    # itself (verified empirically) — hence the single deep-scan filter,
+    # keyed on `operationId` to identify an operation node.
+    given: "$..[?(@ && @.operationId && (!@.security || @.security.length > 0))].responses"
+    then:
+      field: "401"
+      function: truthy
+
+  error-response-is-problem:
+    description: >
+      Every 4xx/5xx response $refs a response object from components/responses.yaml.
+      No operation defines an inline error schema.
+    message: "4xx/5xx responses must $ref components/responses.yaml, not an inline schema."
+    severity: error
+    resolved: false
+    given: "$.paths[*][*].responses[?(@property.match(/^[45]/))]"
+    then:
+      - field: $ref
+        function: truthy
+      - field: $ref
+        function: pattern
+        functionOptions:
+          match: "^\\.\\./components/responses\\.yaml#/"
+
+  no-inline-money:
+    description: >
+      A property named *price*/*total*/*amount*/*subtotal* must be a Money $ref or a
+      documented minor-unit integer — never a bare `number`.
+    message: "Monetary field '{{property}}' must not be typed as `number` — use Money or a minor-unit integer."
+    severity: warn
+    given:
+      - "$..properties[?(@property && @property.match(/(price|total|amount|subtotal)/i))]"
+      - "$..parameters[?(@ && @.name && @.name.match(/(price|total|amount|subtotal)/i))].schema"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          not:
+            required: ["type"]
+            properties:
+              type:
+                const: number
+
+  uuid-format:
+    description: Every property or parameter whose name ends in "Id" has format uuid.
+    message: "'{{property}}' ends in \"Id\" and must have `format: uuid`."
+    severity: error
+    given:
+      - "$..properties[?(@property.match(/Id$/))]"
+      - "$..parameters[?(@ && @.name && @.name.match(/Id$/))].schema"
+    then:
+      # `pattern` silently skips an undefined target (verified empirically —
+      # it did not fire on a property with no `format` at all), so `truthy`
+      # runs first to catch the omitted case; `pattern` then checks the value
+      # when one is present.
+      - field: format
+        function: truthy
+      - field: format
+        function: pattern
+        functionOptions:
+          match: "^uuid$"
+
+  date-time-format:
+    description: Every property whose name ends in "At" has format date-time.
+    message: "'{{property}}' ends in \"At\" and must have `format: date-time`."
+    severity: error
+    given: "$..properties[?(@property.match(/At$/))]"
+    then:
+      - field: format
+        function: truthy
+      - field: format
+        function: pattern
+        functionOptions:
+          match: "^date-time$"
+
+  schema-has-example:
+    description: Every object schema carries an example.
+    message: "Schema must carry an example."
+    severity: error
+    given: "$..[?(@property === 'properties')]^"
+    then:
+      field: example
+      function: truthy
+
+  request-body-no-additional-properties:
+    description: >
+      Request-body schemas set additionalProperties: false, matching the global
+      ValidationPipe's forbidNonWhitelisted.
+    message: "JSON request body schema must set `additionalProperties: false`."
+    severity: warn
+    given: "$.paths[*][get,put,post,delete,patch,options,head,trace].requestBody.content[\"application/json\"].schema"
+    then:
+      - field: additionalProperties
+        function: defined
+      - field: additionalProperties
+        function: schema
+        functionOptions:
+          schema:
+            const: false
+
+  path-must-be-versioned:
+    description: Every path starts with /v1/ — the one convention a careless copy-paste breaks silently.
+    message: "Path must start with /v1/."
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^/v1/"

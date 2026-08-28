@@ -19,11 +19,16 @@ export class PoliciesGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // getAllAndOverride, not get(..., context.getHandler()) alone: a
+    // method-level @CheckPolicies wins if present, but a class-level one
+    // still gets read instead of silently returning [] — see
+    // skus.controller.ts's comment for how that silent case actually
+    // played out (a client request created a SKU before this was fixed).
     const policyHandlers =
-      this.reflector.get<PolicyHandler[]>(
-        CHECK_POLICIES_KEY,
+      this.reflector.getAllAndOverride<PolicyHandler[]>(CHECK_POLICIES_KEY, [
         context.getHandler(),
-      ) ?? [];
+        context.getClass(),
+      ]) ?? [];
 
     const request = context
       .switchToHttp()

@@ -31,12 +31,21 @@ describe('CategoriesService', () => {
   // bolted on) — isUniqueConstraintViolation checks `instanceof`, so it
   // must be the actual class. Use as
   // prisma.category.create.mockRejectedValue(uniqueConstraintError).
+  // Meta shape matches what @prisma/adapter-pg's P2002 actually carries —
+  // verified directly against this project's Postgres setup, not the
+  // classic `meta.target: string[]` shape (see prisma-error.util.ts).
+  // CategoriesService doesn't inspect meta at all (isUniqueConstraintViolation
+  // just checks `code === 'P2002'`), so this only matters for accuracy.
   const uniqueConstraintError = new Prisma.PrismaClientKnownRequestError(
     'Unique constraint failed',
     {
       code: 'P2002',
       clientVersion: '7.10.0',
-      meta: { target: ['name'] },
+      meta: {
+        driverAdapterError: {
+          cause: { constraint: { index: 'categories_name_key' } },
+        },
+      },
     },
   );
 

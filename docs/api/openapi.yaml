@@ -9,6 +9,16 @@ info:
     stock notification. See docs/api/CONVENTIONS.md for the rules this
     contract follows and docs/database/README.md for the data model behind
     it.
+
+
+    **Roles.** `client` — browses the catalog, likes products, manages a
+    cart, places and tracks their own orders. `manager` — owns the catalog,
+    SKUs, promo codes, and the order lifecycle (`process`, `ship`); sees
+    every order. `delivery_person` — marks a `shipped` order `delivered`; no
+    per-order assignment, any delivery person may act on any `shipped`
+    order. Product browsing (`listProducts`, `getProduct`, `listCategories`,
+    `getCategory`) and the Stripe webhook are the only public operations;
+    everything else requires a role.
   contact:
     name: T-Shirt Store API Support
     email: api-support@tshirt-store.example

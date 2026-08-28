@@ -42,6 +42,10 @@ class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  PASSWORD_RESET_TOKEN_EXPIRES_IN!: string;
+
+  @IsString()
+  @IsNotEmpty()
   SMTP_HOST!: string;
 
   @IsInt()

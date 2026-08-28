@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -14,13 +15,21 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
 import { AuthSessionResponseDto } from './dto/auth-session-response.dto';
 import { RefreshTokensRequestDto } from './dto/refresh-tokens-request.dto';
+import { RequestPasswordResetRequestDto } from './dto/request-password-reset-request.dto';
+import { ResetPasswordRequestDto } from './dto/reset-password-request.dto';
 import { SignInRequestDto } from './dto/sign-in-request.dto';
 import { SignOutRequestDto } from './dto/sign-out-request.dto';
 import { SignUpRequestDto } from './dto/sign-up-request.dto';
+
+// Tighter than the global default (see THROTTLE_TTL/THROTTLE_LIMIT env
+// vars): brute-forcing a password or flooding the reset-email flow is the
+// actual risk on these three, not on sign-up or refresh.
+const STRICT_AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 
 @ApiTags('auth')
 @Controller('v1/auth')
@@ -36,6 +45,7 @@ export class AuthController {
 
   @Post('sign-in')
   @HttpCode(HttpStatus.OK)
+  @Throttle(STRICT_AUTH_THROTTLE)
   @ApiOperation({ summary: 'Sign in with email and password' })
   @ApiOkResponse({ type: AuthSessionResponseDto })
   signIn(@Body() dto: SignInRequestDto): Promise<AuthSessionResponseDto> {
@@ -60,5 +70,27 @@ export class AuthController {
   @ApiNoContentResponse()
   async signOut(@Body() dto: SignOutRequestDto): Promise<void> {
     await this.authService.signOut(dto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle(STRICT_AUTH_THROTTLE)
+  @ApiOperation({ summary: 'Request a password reset email' })
+  @ApiAcceptedResponse({
+    description: 'An email was sent if the address belongs to an account.',
+  })
+  async requestPasswordReset(
+    @Body() dto: RequestPasswordResetRequestDto,
+  ): Promise<void> {
+    await this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle(STRICT_AUTH_THROTTLE)
+  @ApiOperation({ summary: 'Reset a password using a reset token' })
+  @ApiNoContentResponse()
+  async resetPassword(@Body() dto: ResetPasswordRequestDto): Promise<void> {
+    await this.authService.resetPassword(dto);
   }
 }

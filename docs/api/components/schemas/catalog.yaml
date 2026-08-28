@@ -62,7 +62,7 @@ ProductImage:
     url:
       type: string
       format: uri
-      description: Built at response time from the stored object key, not stored as a URL.
+      description: Built at response time from the S3 object key, not stored as a URL.
     position:
       type: integer
       minimum: 0

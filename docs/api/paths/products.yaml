@@ -256,7 +256,8 @@
     summary: Upload a product image
     description: >
       `multipart/form-data` with one `file` part. Accepted types: `image/jpeg`,
-      `image/png`, `image/webp`. Maximum size: 5 MiB.
+      `image/png`, `image/webp`. Maximum size: 5 MiB. Stored in AWS S3; the
+      client never talks to S3 directly.
     tags: [products]
     parameters:
       - $ref: ../components/parameters.yaml#/ProductIdParam

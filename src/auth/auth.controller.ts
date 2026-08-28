@@ -26,9 +26,8 @@ import { SignInRequestDto } from './dto/sign-in-request.dto';
 import { SignOutRequestDto } from './dto/sign-out-request.dto';
 import { SignUpRequestDto } from './dto/sign-up-request.dto';
 
-// Tighter than the global default (see THROTTLE_TTL/THROTTLE_LIMIT env
-// vars): brute-forcing a password or flooding the reset-email flow is the
-// actual risk on these three, not on sign-up or refresh.
+// Tighter than the global default — brute-forcing a password or flooding
+// the reset-email flow is the real risk on these three, not sign-up/refresh.
 const STRICT_AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 
 @ApiTags('auth')

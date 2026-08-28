@@ -96,9 +96,8 @@ export class AuthService {
     await this.refreshTokenService.revoke(dto.refreshToken);
   }
 
-  // Always resolves — 202 regardless of whether the email belongs to an
-  // account, so this endpoint can't be used to enumerate registered
-  // emails (see docs/api/paths/auth.yaml#/requestPasswordReset).
+  // Always resolves, whether or not the email belongs to an account, so
+  // this endpoint can't be used to enumerate registered emails.
   async forgotPassword(dto: RequestPasswordResetRequestDto): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },

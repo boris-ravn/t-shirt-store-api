@@ -20,9 +20,9 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          // jsonwebtoken types expiresIn as ms.StringValue | number; ours
-          // comes from a validated env var, e.g. "15m" — a value that
-          // template-literal type can't be verified from a runtime string.
+          // jsonwebtoken types expiresIn as ms.StringValue | number, a
+          // template-literal type a runtime env-var string can't satisfy
+          // without a cast.
           expiresIn: configService.getOrThrow<string>(
             'JWT_ACCESS_EXPIRES_IN',
           ) as StringValue,

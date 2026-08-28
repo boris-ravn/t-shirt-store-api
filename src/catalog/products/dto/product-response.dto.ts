@@ -29,9 +29,9 @@ interface ProductEntity {
   updatedAt: Date;
 }
 
-// Client-facing product: always active and not soft-deleted (enforced by
-// the query that produced it, not by this DTO). See ProductAdminResponseDto
-// for the manager-facing shape.
+// Client-facing product — the active/non-deleted scoping is enforced by the
+// query that produced it, not by this DTO. See ProductAdminResponseDto for
+// the manager-facing shape.
 export class ProductResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

@@ -37,10 +37,7 @@ export class RefreshTokenService {
     return { token, expiresAt };
   }
 
-  // Rotation: the presented token is revoked and a new one issued in its
-  // place, so a copy of the old token stops working from this point on.
-  // Guarded the same way the ERD's stock/promo counters are (README §8) —
-  // the `updateMany` only touches the row if it is still `revokedAt: null`,
+  // The `updateMany` only touches the row if it is still `revokedAt: null`,
   // so two concurrent refreshes on the same token can't both "win".
   async rotate(rawToken: string): Promise<RotatedRefreshToken> {
     const existing = await this.prisma.refreshToken.findUnique({

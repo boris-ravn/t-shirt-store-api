@@ -73,10 +73,8 @@ export class CategoriesService {
     }
   }
 
-  // Hard delete (categories are never referenced by an order — products
-  // are). category-not-empty is the deliberate contract for the products.category_id
-  // NOT NULL FK conflict, checked up front rather than caught as a raw
-  // constraint violation, since it needs the productCount extension member.
+  // Checked up front rather than caught as a raw FK-violation error, since
+  // the response needs the real productCount.
   async delete(id: string): Promise<void> {
     const category = await this.prisma.category.findUnique({
       where: { id },

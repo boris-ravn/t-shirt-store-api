@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-// Builds the public URL from the stored s3_key at response time — decouples
-// stored data from infrastructure, per docs/database/README.md's
-// product_images note. The upload path itself (S3Service) lands in the
-// next commit.
+// Builds the public URL from the stored s3_key at response time, so the
+// stored data stays decoupled from infrastructure (bucket, region, CDN).
 @Injectable()
 export class ImageUrlService {
   constructor(private readonly configService: ConfigService) {}

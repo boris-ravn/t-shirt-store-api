@@ -4,7 +4,7 @@ import { IsOptional, IsString, ValidateNested } from 'class-validator';
 import { MoneyRequestDto } from '../../../common/money/money-request.dto';
 
 // `stock` is deliberately absent — restockSku is the only supported write
-// to it (see docs/decisions.md, "restockSku takes a delta").
+// to it (an absolute PATCH would clobber concurrent reserve/fulfil updates).
 export class UpdateSkuRequestDto {
   @ApiPropertyOptional()
   @IsOptional()

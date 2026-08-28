@@ -8,9 +8,8 @@ import { AuthenticatedUser } from '../common/types/authenticated-user.interface'
 // Authorization only — always follows JwtAuthGuard in @UseGuards(), never
 // used alone. A `false` return isn't handled specially here: Nest's own
 // guard mechanism throws a plain ForbiddenException on a `false` return,
-// which ProblemExceptionFilter's generic-by-status fallback already maps
-// to the `insufficient-permissions` Problem (see the 'add global exception
-// filter' commit) — no bespoke exception needed for this guard.
+// which ProblemExceptionFilter's fallback already maps to the
+// `insufficient-permissions` Problem.
 @Injectable()
 export class PoliciesGuard implements CanActivate {
   constructor(
@@ -20,10 +19,8 @@ export class PoliciesGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     // getAllAndOverride, not get(..., context.getHandler()) alone: a
-    // method-level @CheckPolicies wins if present, but a class-level one
-    // still gets read instead of silently returning [] — see
-    // skus.controller.ts's comment for how that silent case actually
-    // played out (a client request created a SKU before this was fixed).
+    // method-level @CheckPolicies wins if present, but a class-level one is
+    // still read as a fallback instead of being silently treated as [].
     const policyHandlers =
       this.reflector.getAllAndOverride<PolicyHandler[]>(CHECK_POLICIES_KEY, [
         context.getHandler(),

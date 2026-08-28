@@ -20,8 +20,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  // Whatever this returns becomes req.user (see AuthGuard's canActivate) —
-  // kept to {id, role} on purpose, see AuthenticatedUser.
   validate(payload: JwtPayload): AuthenticatedUser {
     return { id: payload.sub, role: payload.role };
   }

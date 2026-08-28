@@ -39,8 +39,6 @@ export class ProductsService {
     const isManager = user?.role === UserRole.manager;
 
     if (query.status && !isManager) {
-      // `status` is manager-only (see docs/api/paths/products.yaml) — a
-      // client passing it gets 403, not a silently-ignored filter.
       throw new ForbiddenException();
     }
 

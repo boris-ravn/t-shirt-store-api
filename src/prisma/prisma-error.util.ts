@@ -17,13 +17,11 @@ export function isRecordNotFound(error: unknown): boolean {
   );
 }
 
-// Prisma 7's driver-adapter (@prisma/adapter-pg) P2002 errors do NOT carry
-// the classic `meta.target: string[]` field-name array — verified
-// empirically against this project's actual Postgres setup, not assumed:
-// meta here is `{ driverAdapterError: { cause: { constraint: { index } } } }`,
-// where `index` is the underlying Postgres constraint/index name (e.g.
-// "skus_sku_code_key"). This is the only way to tell two unique
-// constraints on the same model apart under this setup.
+// Prisma 7's driver-adapter (@prisma/adapter-pg) P2002 errors do not carry
+// the classic `meta.target: string[]` field-name array. The underlying
+// Postgres constraint/index name (e.g. "skus_sku_code_key") lives at
+// `meta.driverAdapterError.cause.constraint.index` instead — the only way
+// to tell two unique constraints on the same model apart under this setup.
 export function uniqueConstraintIndexName(error: unknown): string | undefined {
   if (!isUniqueConstraintViolation(error)) {
     return undefined;

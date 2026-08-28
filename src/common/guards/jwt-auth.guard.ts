@@ -5,8 +5,7 @@ import { AuthenticatedUser } from '../types/authenticated-user.interface';
 
 // Overrides AuthGuard('jwt')'s default handleRequest (which throws Nest's
 // generic UnauthorizedException) so a missing/invalid/expired token raises
-// our own `unauthenticated` Problem instead — see
-// docs/api/components/responses.yaml#/Unauthorized.
+// our own `unauthenticated` Problem instead.
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   handleRequest<TUser = AuthenticatedUser>(

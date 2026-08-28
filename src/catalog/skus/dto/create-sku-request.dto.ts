@@ -3,8 +3,7 @@ import { Type } from 'class-transformer';
 import { IsInt, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { MoneyRequestDto } from '../../../common/money/money-request.dto';
 
-// productId is a body field, not a path segment — consistent with
-// createProduct's categoryId.
+// productId is a body field: POST /v1/skus has no product path segment.
 export class CreateSkuRequestDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()

@@ -17,9 +17,8 @@ export class PasswordResetTokenService {
     private readonly configService: ConfigService,
   ) {}
 
-  // Policy call (docs/database/README.md §9 leaves this open): issuing a new
-  // token invalidates any previous unused ones for the same user, so an
-  // old reset link found later in an inbox can't still work.
+  // Issuing a new token invalidates any previous unused ones for the same
+  // user, so an old reset link found later in an inbox can't still work.
   async issue(userId: string): Promise<string> {
     await this.prisma.passwordResetToken.updateMany({
       where: { userId, usedAt: null },
@@ -47,10 +46,8 @@ export class PasswordResetTokenService {
     return token;
   }
 
-  // Unknown, expired, or already-used all raise the same exception — see
-  // InvalidResetTokenException. The updateMany guard (WHERE id AND
-  // usedAt IS NULL) closes the same double-use race the refresh-token
-  // rotation guards against.
+  // The updateMany guard (WHERE id AND usedAt IS NULL) closes the same
+  // double-use race refresh-token rotation guards against.
   async consume(rawToken: string): Promise<ConsumedResetToken> {
     const existing = await this.prisma.passwordResetToken.findUnique({
       where: { tokenHash: hashToken(rawToken) },

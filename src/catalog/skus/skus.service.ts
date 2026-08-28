@@ -71,9 +71,8 @@ export class SkusService {
     });
   }
 
-  // The only supported write to `stock` this week — a delta, not an
-  // absolute value (see UpdateSkuRequestDto). The other four guarded stock
-  // transitions in README §8 belong to cart/orders/payments.
+  // The only supported write to `stock` — a delta, not an absolute value
+  // (see UpdateSkuRequestDto for why).
   async restock(
     id: string,
     dto: RestockSkuRequestDto,

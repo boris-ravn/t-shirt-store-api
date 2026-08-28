@@ -27,11 +27,9 @@ import { SkuAdminResponseDto } from './dto/sku-admin-response.dto';
 import { UpdateSkuRequestDto } from './dto/update-sku-request.dto';
 import { SkusService } from './skus.service';
 
-// @CheckPolicies is applied per-method, not once at class level: PoliciesGuard
-// reads context.getHandler() (method-level Reflector metadata) only — a
-// class-level @CheckPolicies would silently never be read, and every route
-// below would pass with no CASL check at all. (Caught live: a client
-// request successfully created a SKU before this was fixed.)
+// @CheckPolicies is applied per-method, not once at class level — a
+// class-level decorator here would be read only as PoliciesGuard's
+// fallback, which still requires each route to declare its own policy.
 @ApiTags('skus')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

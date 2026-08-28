@@ -2,8 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { AppException } from '../../common/exceptions/app.exception';
 
 // Thrown for a token that is unknown, expired, or already used — one
-// message for all three, so a caller can't distinguish them (see
-// docs/api/paths/auth.yaml#/resetPassword).
+// message for all three, so a caller can't distinguish them.
 export class InvalidResetTokenException extends AppException {
   constructor() {
     super(

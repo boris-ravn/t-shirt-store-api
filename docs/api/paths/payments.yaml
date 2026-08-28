@@ -36,9 +36,7 @@
       Quick-purchase flow: creates a `pending` order first so its id can
       ride as `client_reference_id` on the Stripe payment link, then
       returns the order alongside the checkout URL. Reserves no stock — the
-      201 is not a promise of availability. `payment_links` rows are
-      created lazily by the system on first use of a SKU; there is no
-      manager endpoint over them.
+      201 is not a promise of availability.
     tags: [payments]
     requestBody:
       required: true

@@ -45,8 +45,7 @@
       marked `delivered` — narrowing to `shipped` alone would make their own
       delivery history unreadable, since a delivered order is no longer
       `shipped`. `deliveredBy=me` is a delivery-person-only filter (403 for
-      anyone else) that resolves through the status history's
-      `(changedBy, status, createdAt)` index.
+      anyone else).
     tags: [orders]
     parameters:
       - name: status

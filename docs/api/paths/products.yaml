@@ -6,9 +6,8 @@
       A client sees `Product` items scoped to `status = active AND deleted_at
       IS NULL`; a manager sees `ProductAdmin` items scoped to all
       non-deleted products, via `status` (manager-only — 403 for a client).
-      `sort=price` and `minPrice`/`maxPrice` require joining `skus` and
-      cannot use the `(category_id, created_at)` index that covers the
-      default sort and the `categoryId` filter.
+      `sort=price` and the price-range filter require joining `skus`, and
+      are slower than the default sort.
     tags: [products]
     security: []
     parameters:

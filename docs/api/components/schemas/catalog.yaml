@@ -242,11 +242,7 @@ RestockSkuRequest:
 
 ProductBase:
   type: object
-  description: >
-    Fields identical across both representations. `skus` is deliberately not
-    here — Product and ProductAdmin each declare it once, with a different
-    item schema, so it is never re-declared across allOf branches of the
-    same schema (which JSON Schema would intersect, not override).
+  description: Fields shared by `Product` and `ProductAdmin`.
   properties:
     id:
       type: string

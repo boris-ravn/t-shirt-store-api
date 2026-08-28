@@ -1,0 +1,141 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// Week 3 slice: only the tables auth/catalog/skus need.
+// The rest of docs/database/erd.dbml (cart, promos, orders, payments,
+// notifications) is added incrementally as those features are designed.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  manager
+  client
+  delivery_person
+
+  @@map("user_role")
+}
+
+enum ProductStatus {
+  active
+  disabled
+
+  @@map("product_status")
+}
+
+model User {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  role              UserRole  @default(client)
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Category {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId  String        @map("category_id") @db.Uuid
+  name        String
+  description String?
+  status      ProductStatus @default(active)
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  category Category       @relation(fields: [categoryId], references: [id])
+  images   ProductImage[]
+  skus     Sku[]
+
+  @@index([categoryId, createdAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  s3Key     String   @map("s3_key")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+// sku_code and (productId, size, color) are declared as plain @unique here,
+// matching erd.dbml — both must become partial (`WHERE deleted_at IS NULL`)
+// by hand in the generated migration; see docs/database/README.md §9.
+model Sku {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String    @map("product_id") @db.Uuid
+  skuCode       String    @unique @map("sku_code")
+  size          String
+  color         String
+  price         Int
+  stock         Int       @default(0)
+  reservedStock Int       @default(0) @map("reserved_stock")
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, size, color])
+  @@index([productId])
+  @@map("skus")
+}

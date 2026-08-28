@@ -53,3 +53,12 @@ pids
 # Generated OpenAPI bundle — regenerate with:
 # npx @redocly/cli@latest bundle docs/api/openapi.yaml -o docs/api/openapi.bundled.yaml
 docs/api/openapi.bundled.yaml
+
+/src/generated/prisma
+
+# Prisma's best-effort agent-skill install (`prisma init`) — local tooling,
+# not project source.
+/.agents
+/.claude/skills
+/.windsurf
+/skills-lock.json

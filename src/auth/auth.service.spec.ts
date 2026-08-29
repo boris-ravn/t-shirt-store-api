@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '../generated/prisma/client';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
@@ -170,6 +171,26 @@ describe('AuthService', () => {
           createdAt: existingUser.createdAt,
         },
       });
+    });
+
+    it('throws EmailAlreadyRegisteredException when user.create hits the unique constraint (lost a race to a concurrent sign-up)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      passwordService.hash.mockResolvedValue('hashed-password');
+      prisma.user.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '7.10.0',
+          meta: {
+            driverAdapterError: {
+              cause: { constraint: { index: 'users_email_key' } },
+            },
+          },
+        }),
+      );
+
+      await expect(service.signUp(signUpDto)).rejects.toBeInstanceOf(
+        EmailAlreadyRegisteredException,
+      );
     });
   });
 

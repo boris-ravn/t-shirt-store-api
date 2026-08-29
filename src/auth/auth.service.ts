@@ -6,6 +6,7 @@ import type { StringValue } from 'ms';
 import { UserRole } from '../generated/prisma/enums';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isUniqueConstraintViolation } from '../prisma/prisma-error.util';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthSessionResponseDto } from './dto/auth-session-response.dto';
 import { RefreshTokensRequestDto } from './dto/refresh-tokens-request.dto';
@@ -43,6 +44,9 @@ export class AuthService {
   ) {}
 
   async signUp(dto: SignUpRequestDto): Promise<AuthSessionResponseDto> {
+    // Fast path only — two concurrent sign-ups for the same email can both
+    // pass this check before either create() commits, so the real guarantee
+    // is the catch below, not this lookup.
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -51,14 +55,22 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwordService.hash(dto.password);
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+        },
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new EmailAlreadyRegisteredException();
+      }
+      throw error;
+    }
 
     return this.issueSession(user);
   }

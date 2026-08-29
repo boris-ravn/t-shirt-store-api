@@ -81,3 +81,43 @@ The plan was scaffolding for an execution phase, not a permanent artifact — it
 ### 2026-08-21 — Product image upload stays multipart-through-the-API, not a presigned S3 URL
 
 Two ways to get a file into S3: the client uploads to our API and the service pushes to S3 (current), or the client asks the API for a presigned URL and uploads directly to S3, then confirms. For product photos — a few MB, not user-generated video — the presigned flow buys scale this project doesn't need and costs real complexity: an S3 CORS policy, a confirm-completion step, a cleanup story for uploads that start and never confirm, and file-type/size validation that runs *after* the bytes already landed in the bucket instead of before. Multipart-through-the-API validates before anything touches S3, matching the existing 413/415 error catalog cleanly, and is one API call end to end. If upload volume or file size ever becomes a real bottleneck, moving to presigned URLs is a contained, well-understood change — but it is not one this project's scale justifies now.
+
+### 2026-08-28 — Prisma pinned to 7.10.0, not the 8.0.0-rc npm installs by default
+
+`npm install prisma` resolved `latest` to `8.0.0-rc.12` — a release candidate, not a stable release; `7.10.0` was the last stable tag (`prev`). Pinned to `7.10.0` with `--save-exact`: prisma.io's docs and the reference material `prisma init` itself installs both describe this as current, and a training project shouldn't be built against a pre-release's API surface. The same reasoning applied one layer further in: `@nestjs/config`, `@nestjs/jwt` and `@nestjs/passport` all resolve to majors realigned with Nest's own version numbering (v12) and shipped as ESM-only (`"type": "module"`) — which breaks ts-jest's CommonJS transform outright, surfaced by the first test file rather than by npm's peer-dependency warning. Pinned each to its last CJS, Nest-v11-compatible release instead (`4.0.4`, `11.0.2`, `11.0.5`).
+
+### 2026-08-28 — Prisma schema modeled incrementally, not the full ERD in one migration
+
+`schema.prisma` holds only the seven tables and two enums Week 3 actually touches (`users`, `password_reset_tokens`, `refresh_tokens`, `categories`, `products`, `product_images`, `skus`); `orders`, `payments`, `promo_codes` and the rest of `docs/database/erd.dbml` are added as each Week 4 feature is designed. Rejected modeling the complete, already-approved ERD up front — Prisma migrations are additive, so there's no cost to deferring, and there would be no way to validate those tables' shape against real code until the features that use them exist anyway.
+
+### 2026-08-28 — Layering: `Controller → Service → PrismaService` directly, no repository layer
+
+Settled during Week 3 planning and followed since: every service in `auth`, `users` and `catalog` injects `PrismaService` directly rather than going through a repository abstraction. Chosen alongside the unit-test-strategy decision below — a repository layer here would exist mainly to be mocked in unit tests, which is exactly the "unit test wearing a costume" the root `CLAUDE.md`'s testing section warns about.
+
+### 2026-08-28 — Unit tests mock `PrismaService`; persistence correctness is an e2e concern
+
+Every `*.service.spec.ts` from Week 3 mocks `PrismaService` with `jest.fn()`s rather than hitting a real database — the standard NestJS testing-module pattern. What's under test is branch logic (which exception fires, which fields get written, role-based visibility), not whether Postgres actually enforces a constraint; the Testcontainers-backed e2e suite covers that. A more literal reading of the root `CLAUDE.md`'s "mock only what genuinely cannot run locally" — hitting real Postgres even for these — was evaluated and set aside for Week 3's pace; the repository-free layering above means there's no fake abstraction being mocked either way, only Prisma's own generated client shape.
+
+### 2026-08-28 — Password-change email is synchronous this week; BullMQ arrives in Week 4
+
+`MailService` (nodemailer → local Mailhog in dev) is called directly and awaited from `AuthService.resetPassword`, with no queue in front of it. Rejected standing up BullMQ/Redis a week early for a single non-critical email — it lands in Week 4 alongside the stock-notification job that actually needs asynchronous, retryable delivery.
+
+### 2026-08-28 — Refresh and password-reset tokens: opaque random bytes hashed with sha256, not bcrypt
+
+Both `RefreshTokenService` and `PasswordResetTokenService` generate a 256-bit random token and store `sha256(token)` — never the raw value, and never a bcrypt hash. bcrypt was rejected specifically because its per-call salt makes exact-match lookup (`WHERE token_hash = ?`) impossible: there's no single digest to index on, so verifying a presented token would mean fetching every outstanding row and calling `bcrypt.compare` on each one. bcrypt's slow, salted hashing exists to blunt brute-forcing a low-entropy secret (a password); it buys nothing for a token that already has 256 bits of entropy.
+
+### 2026-08-28 — Explicit per-route guards, not a global guard with a `@Public()` opt-out
+
+`JwtAuthGuard`/`OptionalJwtAuthGuard` are applied per-operation via `@UseGuards()`, mirroring the contract's own per-operation `security` field, rather than a global `APP_GUARD` with public routes opting out via a decorator. Rejected the global-guard pattern because the contract has a third case beyond "public" and "protected": `listProducts`/`getProduct` are public but shape their response by role *if* the caller happens to be authenticated, which a binary public/protected split doesn't model without an awkward exception.
+
+### 2026-08-28 — `@CheckPolicies` must be applied per-method, never once at the controller class level
+
+Found by live testing, not code review: applying `@CheckPolicies(...)` once on `SkusController` instead of on each `@Post()`/`@Patch()`/`@Delete()` method let a client successfully create a SKU. `PoliciesGuard` originally read only `context.getHandler()` (method-level Reflector metadata) — a class-level decorator was invisible to it, and the guard's `policyHandlers ?? []` silently fell back to an empty, always-passing list. Fixed at both ends: the decorator moved back to per-method (matching `categories`/`products`), and `PoliciesGuard` itself now checks `getAllAndOverride([handler, class])`, so a class-level `@CheckPolicies` is read as a fallback instead of silently doing nothing, should this be attempted again.
+
+### 2026-08-28 — `JwtStrategy` trusts the `role` embedded in the access token; it is not re-read from the database per request
+
+`JwtStrategy.validate` returns `{ id: payload.sub, role: payload.role }` straight from the token — no `prisma.user.findUnique` in the hot path of every authenticated request. Consequence accepted: if a manager's role is downgraded, the old access token still carries `role: manager` and passes `PoliciesGuard` until it expires (`JWT_ACCESS_EXPIRES_IN`, currently 15m) or the user's sessions are revoked and a fresh token is issued. Re-checking the role against Postgres on every request would close that window but adds a DB round trip to every single authenticated call for a project at this scale and threat model. Revisit if role changes ever need to take effect immediately (e.g. an admin forcibly demoting a compromised account) — the fix there is revoking that user's refresh tokens (`RefreshTokenService.revokeAllForUser`, already used by `resetPassword`) plus a short access-token TTL, not a per-request DB check.
+
+### 2026-08-28 — SKU duplicate-constraint detection reads the Postgres index name, not `meta.target`
+
+`duplicate-sku`'s `conflictingField` needs to say which unique constraint fired — `skuCode` or `(productId, size, color)`. Classic Prisma exposes this via `error.meta.target: string[]`; verified directly against this project's actual Postgres + `@prisma/adapter-pg` setup that a P2002 error here carries no such array at all — the constraint name lives at `meta.driverAdapterError.cause.constraint.index` instead (e.g. `"skus_sku_code_key"`). `prisma-error.util.ts`'s `uniqueConstraintIndexName` reads that path instead; every `duplicate-sku` response was reporting the wrong `conflictingField` until this was found and fixed by a live test.

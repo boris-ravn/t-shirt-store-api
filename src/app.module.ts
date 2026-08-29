@@ -1,8 +1,39 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AuthModule } from './auth/auth.module';
+import { CaslModule } from './casl/casl.module';
+import { CatalogModule } from './catalog/catalog.module';
+import { validate } from './config/env.validation';
+import { PrismaModule } from './prisma/prisma.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate,
+    }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            name: 'default',
+            ttl: configService.getOrThrow<number>('THROTTLE_TTL') * 1000,
+            limit: configService.getOrThrow<number>('THROTTLE_LIMIT'),
+          },
+        ],
+      }),
+    }),
+    PrismaModule,
+    CaslModule,
+    AuthModule,
+    UsersModule,
+    CatalogModule,
+  ],
   controllers: [],
-  providers: [],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

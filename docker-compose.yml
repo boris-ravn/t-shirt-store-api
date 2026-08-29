@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tshirt_store
+      POSTGRES_PASSWORD: tshirt_store
+      POSTGRES_DB: tshirt_store
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tshirt_store"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+  # S3-compatible local target for product image uploads — there's no real
+  # AWS account for this training project. See AWS_S3_ENDPOINT in
+  # .env.example; unset it (or point it at nothing) to use real AWS instead.
+  minio:
+    image: minio/minio:RELEASE.2025-04-08T15-41-24Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: tshirt_store
+      MINIO_ROOT_PASSWORD: tshirt_store_minio
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -165,9 +165,17 @@ describe('SkusService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it.todo(
-      'throws NotFoundException when the SKU is active but its parent product is soft-deleted',
-    );
+    it('throws NotFoundException when the SKU is active but its parent product is soft-deleted', async () => {
+      prisma.sku.findUnique.mockResolvedValue({
+        ...activeSku,
+        product: { deletedAt: new Date() },
+      });
+
+      await expect(
+        service.update(activeSku.id, updateDto),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.sku.update).not.toHaveBeenCalled();
+    });
 
     it('throws DuplicateSkuException on either unique constraint, distinguished by index name', async () => {
       prisma.sku.findUnique.mockResolvedValue(activeSku);
@@ -208,9 +216,17 @@ describe('SkusService', () => {
       expect(prisma.sku.update).not.toHaveBeenCalled();
     });
 
-    it.todo(
-      'throws NotFoundException when the SKU is active but its parent product is soft-deleted',
-    );
+    it('throws NotFoundException when the SKU is active but its parent product is soft-deleted', async () => {
+      prisma.sku.findUnique.mockResolvedValue({
+        ...activeSku,
+        product: { deletedAt: new Date() },
+      });
+
+      await expect(service.delete(activeSku.id)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.sku.update).not.toHaveBeenCalled();
+    });
 
     it('throws SkuReservedException with the real reservedStock when reservedStock > 0', async () => {
       prisma.sku.findUnique.mockResolvedValue({
@@ -261,9 +277,17 @@ describe('SkusService', () => {
       expect(prisma.sku.update).not.toHaveBeenCalled();
     });
 
-    it.todo(
-      'throws NotFoundException when the SKU is active but its parent product is soft-deleted',
-    );
+    it('throws NotFoundException when the SKU is active but its parent product is soft-deleted', async () => {
+      prisma.sku.findUnique.mockResolvedValue({
+        ...activeSku,
+        product: { deletedAt: new Date() },
+      });
+
+      await expect(
+        service.restock(activeSku.id, { quantity: 5 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.sku.update).not.toHaveBeenCalled();
+    });
 
     it('increments stock by quantity (a delta, not an absolute value)', async () => {
       prisma.sku.findUnique.mockResolvedValue(activeSku);

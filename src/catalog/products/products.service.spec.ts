@@ -207,9 +207,21 @@ describe('ProductsService', () => {
       });
     });
 
-    it.todo(
-      'excludes soft-deleted SKUs from every response (the skus include is scoped to deletedAt: null, for both client and manager shapes)',
-    );
+    it('excludes soft-deleted SKUs from every response (the skus include is scoped to deletedAt: null, for both client and manager shapes)', async () => {
+      prisma.product.count.mockResolvedValue(1);
+      prisma.product.findMany.mockResolvedValue([activeProduct]);
+
+      await service.list(baseQuery, clientUser);
+      expect(prisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ include: EXPECTED_PRODUCT_INCLUDE }),
+      );
+
+      prisma.product.findMany.mockClear();
+      await service.list(baseQuery, managerUser);
+      expect(prisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ include: EXPECTED_PRODUCT_INCLUDE }),
+      );
+    });
 
     it('uses sku.groupBy + a hydration query, not product.findMany.orderBy, when sort is price/-price', async () => {
       prisma.product.count.mockResolvedValue(1);
@@ -233,9 +245,22 @@ describe('ProductsService', () => {
       });
     });
 
-    it.todo(
-      "computes `total` from a query that also requires >=1 non-deleted SKU when sort is price/-price, so it can't exceed what's actually reachable through that sort mode",
-    );
+    it("computes `total` from a query that also requires >=1 non-deleted SKU when sort is price/-price, so it can't exceed what's actually reachable through that sort mode", async () => {
+      prisma.product.count.mockResolvedValue(1);
+      prisma.sku.groupBy.mockResolvedValue([{ productId: 'product-1' }]);
+      prisma.product.findMany.mockResolvedValue([activeProduct]);
+
+      await service.list({ ...baseQuery, sort: 'price' as const }, clientUser);
+
+      expect(prisma.product.count).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { deletedAt: null, status: 'active' },
+            { skus: { some: { deletedAt: null } } },
+          ],
+        },
+      });
+    });
 
     // findProductsPage re-sorts the hydrated rows to match the groupBy
     // order explicitly (via the ids.map(...).filter(...) pass) rather than

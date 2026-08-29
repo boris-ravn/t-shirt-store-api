@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsInt } from 'class-validator';
+import { IsIn, IsInt, Min } from 'class-validator';
 import { STORE_CURRENCY } from './store-currency.constant';
 
 // `currency` must equal STORE_CURRENCY — a mismatch is a client bug worth
@@ -7,6 +7,7 @@ import { STORE_CURRENCY } from './store-currency.constant';
 export class MoneyRequestDto {
   @ApiProperty({ description: 'Minor units of `currency`.' })
   @IsInt()
+  @Min(0)
   amount!: number;
 
   @ApiProperty({ pattern: '^[A-Z]{3}$' })

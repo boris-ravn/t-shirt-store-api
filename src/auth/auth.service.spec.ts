@@ -58,9 +58,9 @@ describe('AuthService', () => {
         update: jest.fn(),
         findUniqueOrThrow: jest.fn(),
       },
-      // Runs the callback with the same mock object as `tx` — Boris's
-      // existing assertions on prisma.user.update keep working unchanged
-      // since tx.user.update === prisma.user.update here.
+      // Runs the callback with the same mock object as `tx`, so
+      // tx.user.update === prisma.user.update and assertions on either
+      // reference resolve to the same mock.
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation(
@@ -348,8 +348,28 @@ describe('AuthService', () => {
       );
     });
 
-    it.todo(
-      'revokes every refresh token for the user in the same transaction as the password update (refreshTokenService.revokeAllForUser called with userId and the tx client)',
-    );
+    it('revokes every refresh token for the user in the same transaction as the password update (refreshTokenService.revokeAllForUser called with userId and the tx client)', async () => {
+      passwordResetTokenService.consume.mockResolvedValue({
+        userId: existingUser.id,
+      });
+      passwordService.hash.mockResolvedValue('new-hashed-password');
+      prisma.user.update.mockResolvedValue(existingUser);
+
+      await service.resetPassword(dto);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(refreshTokenService.revokeAllForUser).toHaveBeenCalledWith(
+        existingUser.id,
+        prisma,
+      );
+      // The password write and the revoke must run inside the same
+      // transaction callback, not as two independent top-level calls.
+      const updateOrder = prisma.user.update.mock.invocationCallOrder[0];
+      const revokeOrder =
+        refreshTokenService.revokeAllForUser.mock.invocationCallOrder[0];
+      expect(prisma.$transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        Math.min(updateOrder, revokeOrder),
+      );
+    });
   });
 });

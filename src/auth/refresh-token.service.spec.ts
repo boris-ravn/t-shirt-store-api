@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { hashToken } from '../common/crypto/token.util';
+import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InvalidRefreshTokenException } from './exceptions/invalid-refresh-token.exception';
 import { RefreshTokenService } from './refresh-token.service';
@@ -167,12 +168,32 @@ describe('RefreshTokenService', () => {
   });
 
   describe('revokeAllForUser', () => {
-    it.todo(
-      'revokes every non-revoked row for the user (updateMany WHERE userId AND revokedAt IS NULL)',
-    );
+    it('revokes every non-revoked row for the user (updateMany WHERE userId AND revokedAt IS NULL)', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 3 });
 
-    it.todo(
-      'uses the passed-in transaction client instead of the injected PrismaService, when one is given',
-    );
+      await service.revokeAllForUser('user-1');
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) as Date },
+      });
+    });
+
+    it('uses the passed-in transaction client instead of the injected PrismaService, when one is given', async () => {
+      const tx = {
+        refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      };
+
+      await service.revokeAllForUser(
+        'user-1',
+        tx as unknown as Prisma.TransactionClient,
+      );
+
+      expect(tx.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) as Date },
+      });
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
   });
 });

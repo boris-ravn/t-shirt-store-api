@@ -8,8 +8,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeTakenException } from './exceptions/promo-code-taken.exception';
 import { PromosService } from './promos.service';
 
-// Scaffold: fixtures/mocks are wired up, assertions are TODOs for the
-// dedicated testing pass (matches the cart/likes slices' workflow).
 describe('PromosService', () => {
   let service: PromosService;
   let prisma: {
@@ -112,8 +110,17 @@ describe('PromosService', () => {
 
       await service.create(percentageDto, managerId);
 
-      // TODO(testing agent): assert prisma.promoCode.create was called with
-      // data.code === 'WELCOME15', not the lowercase input.
+      expect(prisma.promoCode.create).toHaveBeenCalledWith({
+        data: {
+          code: 'WELCOME15',
+          discountType: DiscountType.percentage,
+          discountValue: 15,
+          minPurchaseAmount: null,
+          expiresAt: new Date(percentageDto.expiresAt),
+          usageLimit: 500,
+          createdBy: managerId,
+        },
+      });
     });
 
     it('throws PromoCodeTakenException on a P2002 violation', async () => {
@@ -129,8 +136,17 @@ describe('PromosService', () => {
 
       await service.create(percentageDto, managerId);
 
-      // TODO(testing agent): assert prisma.promoCode.create's data includes
-      // discountType: 'percentage', discountValue: 15.
+      expect(prisma.promoCode.create).toHaveBeenCalledWith({
+        data: {
+          code: 'WELCOME15',
+          discountType: DiscountType.percentage,
+          discountValue: 15,
+          minPurchaseAmount: null,
+          expiresAt: new Date(percentageDto.expiresAt),
+          usageLimit: 500,
+          createdBy: managerId,
+        },
+      });
     });
 
     it('maps a fixedAmount discount to discountType/discountValue', async () => {
@@ -145,8 +161,17 @@ describe('PromosService', () => {
 
       await service.create(dto, managerId);
 
-      // TODO(testing agent): assert prisma.promoCode.create's data includes
-      // discountType: 'fixed_amount', discountValue: 500.
+      expect(prisma.promoCode.create).toHaveBeenCalledWith({
+        data: {
+          code: 'WELCOME15',
+          discountType: DiscountType.fixed_amount,
+          discountValue: 500,
+          minPurchaseAmount: null,
+          expiresAt: new Date(dto.expiresAt),
+          usageLimit: 500,
+          createdBy: managerId,
+        },
+      });
     });
 
     it('stores minPurchaseAmount as null when omitted', async () => {
@@ -154,7 +179,17 @@ describe('PromosService', () => {
 
       await service.create(percentageDto, managerId);
 
-      // TODO(testing agent): assert data.minPurchaseAmount === null.
+      expect(prisma.promoCode.create).toHaveBeenCalledWith({
+        data: {
+          code: 'WELCOME15',
+          discountType: DiscountType.percentage,
+          discountValue: 15,
+          minPurchaseAmount: null,
+          expiresAt: new Date(percentageDto.expiresAt),
+          usageLimit: 500,
+          createdBy: managerId,
+        },
+      });
     });
 
     it('stores minPurchaseAmount.amount when provided', async () => {
@@ -169,7 +204,17 @@ describe('PromosService', () => {
 
       await service.create(dto, managerId);
 
-      // TODO(testing agent): assert data.minPurchaseAmount === 2000.
+      expect(prisma.promoCode.create).toHaveBeenCalledWith({
+        data: {
+          code: 'WELCOME15',
+          discountType: DiscountType.percentage,
+          discountValue: 15,
+          minPurchaseAmount: 2000,
+          expiresAt: new Date(dto.expiresAt),
+          usageLimit: 500,
+          createdBy: managerId,
+        },
+      });
     });
   });
 
@@ -189,10 +234,10 @@ describe('PromosService', () => {
 
       await service.update(promoId, { isActive: false });
 
-      // TODO(testing agent): assert prisma.promoCode.update's data does NOT
-      // include discountType/discountValue/expiresAt/minPurchaseAmount keys
-      // at all (not even as undefined causing an unwanted overwrite), only
-      // { isActive: false, usageLimit: undefined }.
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: promoId },
+        data: { isActive: false, usageLimit: undefined },
+      });
     });
 
     it('clears minPurchaseAmount when explicitly set to null', async () => {
@@ -204,8 +249,14 @@ describe('PromosService', () => {
 
       await service.update(promoId, { minPurchaseAmount: null });
 
-      // TODO(testing agent): assert data.minPurchaseAmount === null — this
-      // is the omitted-vs-null distinction the DTO's @ValidateIf exists for.
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: promoId },
+        data: {
+          minPurchaseAmount: null,
+          usageLimit: undefined,
+          isActive: undefined,
+        },
+      });
     });
 
     it('updates discountType/discountValue when a new discount is given', async () => {
@@ -219,8 +270,15 @@ describe('PromosService', () => {
         },
       });
 
-      // TODO(testing agent): assert data.discountType === 'fixed_amount' and
-      // data.discountValue === 500.
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: promoId },
+        data: {
+          discountType: DiscountType.fixed_amount,
+          discountValue: 500,
+          usageLimit: undefined,
+          isActive: undefined,
+        },
+      });
     });
   });
 
@@ -236,8 +294,16 @@ describe('PromosService', () => {
         offset: 0,
       });
 
-      // TODO(testing agent): assert prisma.promoCode.findMany/count were
-      // called with where including isActive: true.
+      const expectedWhere = {
+        isActive: true,
+        expiresAt: { gt: expect.any(Date) as Date },
+      };
+      expect(prisma.promoCode.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expectedWhere, skip: 0, take: 20 }),
+      );
+      expect(prisma.promoCode.count).toHaveBeenCalledWith({
+        where: expectedWhere,
+      });
     });
 
     it('applies no isActive filter when omitted', async () => {
@@ -246,7 +312,11 @@ describe('PromosService', () => {
 
       await service.list({ includeExpired: false, limit: 20, offset: 0 });
 
-      // TODO(testing agent): assert the where clause has no isActive key.
+      expect(prisma.promoCode.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { expiresAt: { gt: expect.any(Date) as Date } },
+        }),
+      );
     });
 
     it('excludes expired codes by default (includeExpired: false)', async () => {
@@ -255,8 +325,11 @@ describe('PromosService', () => {
 
       await service.list({ includeExpired: false, limit: 20, offset: 0 });
 
-      // TODO(testing agent): assert where.expiresAt === { gt: <a Date close
-      // to now> }.
+      expect(prisma.promoCode.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { expiresAt: { gt: expect.any(Date) as Date } },
+        }),
+      );
     });
 
     it('includes expired codes when includeExpired is true', async () => {
@@ -265,7 +338,9 @@ describe('PromosService', () => {
 
       await service.list({ includeExpired: true, limit: 20, offset: 0 });
 
-      // TODO(testing agent): assert the where clause has no expiresAt key.
+      expect(prisma.promoCode.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
     });
   });
 
@@ -283,9 +358,7 @@ describe('PromosService', () => {
 
       const result = await service.getById(promoId);
 
-      // TODO(testing agent): assert result.discount is the Percentage
-      // discriminated shape ({ type: 'percentage', percent: 15 }).
-      void result;
+      expect(result.discount).toEqual({ type: 'percentage', percent: 15 });
     });
   });
 
@@ -306,10 +379,16 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'NOPE');
 
-      // TODO(testing agent): assert result === { valid: false, reason:
-      // 'invalid', discount: null, subtotal: {amount:3998,currency:'USD'},
-      // total: {amount:3998,currency:'USD'} }.
-      void result;
+      expect(prisma.promoCode.findUnique).toHaveBeenCalledWith({
+        where: { code: 'NOPE' },
+      });
+      expect(result).toEqual({
+        valid: false,
+        reason: 'invalid',
+        discount: null,
+        subtotal: { amount: 3998, currency: 'USD' },
+        total: { amount: 3998, currency: 'USD' },
+      });
     });
 
     it("returns reason:'invalid' when the code exists but isActive is false", async () => {
@@ -321,7 +400,13 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'WELCOME15');
 
-      void result;
+      expect(result).toEqual({
+        valid: false,
+        reason: 'invalid',
+        discount: null,
+        subtotal: { amount: 3998, currency: 'USD' },
+        total: { amount: 3998, currency: 'USD' },
+      });
     });
 
     it("returns reason:'expired' when past expiresAt", async () => {
@@ -333,7 +418,13 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'WELCOME15');
 
-      void result;
+      expect(result).toEqual({
+        valid: false,
+        reason: 'expired',
+        discount: null,
+        subtotal: { amount: 3998, currency: 'USD' },
+        total: { amount: 3998, currency: 'USD' },
+      });
     });
 
     it("returns reason:'exhausted' when timesRedeemed >= usageLimit", async () => {
@@ -346,7 +437,13 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'WELCOME15');
 
-      void result;
+      expect(result).toEqual({
+        valid: false,
+        reason: 'exhausted',
+        discount: null,
+        subtotal: { amount: 3998, currency: 'USD' },
+        total: { amount: 3998, currency: 'USD' },
+      });
     });
 
     it("returns reason:'minimum-not-met' when subtotal is below minPurchaseAmount", async () => {
@@ -358,7 +455,13 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'WELCOME15');
 
-      void result;
+      expect(result).toEqual({
+        valid: false,
+        reason: 'minimum-not-met',
+        discount: null,
+        subtotal: { amount: 1000, currency: 'USD' },
+        total: { amount: 1000, currency: 'USD' },
+      });
     });
 
     it('computes a percentage discount, rounded, when everything checks out', async () => {
@@ -367,10 +470,13 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'WELCOME15');
 
-      // TODO(testing agent): assert result.valid === true, reason === null,
-      // discount === Math.round(3998 * 15 / 100) = 600 (in minor units),
-      // total === 3998 - 600.
-      void result;
+      expect(result).toEqual({
+        valid: true,
+        reason: null,
+        discount: { amount: 600, currency: 'USD' },
+        subtotal: { amount: 3998, currency: 'USD' },
+        total: { amount: 3398, currency: 'USD' },
+      });
     });
 
     it('caps a fixedAmount discount at the subtotal so total never goes negative', async () => {
@@ -379,10 +485,13 @@ describe('PromosService', () => {
 
       const result = await service.validate(userId, 'FLAT500');
 
-      // TODO(testing agent): fixedAmountPromo.discountValue is 500 > the
-      // 300 subtotal — assert discount is capped at 300 and total is 0, not
-      // negative.
-      void result;
+      expect(result).toEqual({
+        valid: true,
+        reason: null,
+        discount: { amount: 300, currency: 'USD' },
+        subtotal: { amount: 300, currency: 'USD' },
+        total: { amount: 0, currency: 'USD' },
+      });
     });
   });
 });

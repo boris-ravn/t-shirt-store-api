@@ -45,8 +45,8 @@ interface OrderListBody {
 // are seeded directly via Prisma in various statuses/totals/createdAt —
 // bypassing cart → checkout → payment entirely, since this suite is about
 // listOrders' filtering/pagination/ownership, not the checkout flow itself
-// (covered by OrdersService's unit tests and manual verification instead;
-// the full cart-to-paid-via-Stripe-webhook path lands with Slice 5).
+// (see checkout.e2e-spec.ts for that; the full cart-to-paid-via-Stripe-
+// webhook path lands with Slice 5).
 describe('Order history (e2e)', () => {
   let container: StartedPostgreSqlContainer;
   let app: INestApplication;

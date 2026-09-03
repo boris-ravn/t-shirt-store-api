@@ -43,6 +43,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
   cart                Cart?
+  likes               Like[]
 
   @@map("users")
 }
@@ -100,6 +101,7 @@ model Product {
   category Category       @relation(fields: [categoryId], references: [id])
   images   ProductImage[]
   skus     Sku[]
+  likes    Like[]
 
   @@index([categoryId, createdAt])
   @@map("products")
@@ -171,4 +173,19 @@ model CartItem {
 
   @@unique([cartId, skuId])
   @@map("cart_items")
+}
+
+// product_id, not sku_id — a like applies to the product, not one variant.
+model Like {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("likes")
 }

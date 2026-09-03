@@ -7,6 +7,7 @@ import { CartModule } from './cart/cart.module';
 import { CaslModule } from './casl/casl.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { validate } from './config/env.validation';
+import { LikesModule } from './likes/likes.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     CatalogModule,
     CartModule,
+    LikesModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

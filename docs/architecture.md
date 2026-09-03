@@ -38,7 +38,7 @@ Every 4xx/5xx returns the same RFC 9457 `application/problem+json` shape (`Probl
 - **Authentication**: JWT access token (short-lived, role embedded, not re-read from the DB per request — see `decisions.md`) + opaque refresh token (sha256-hashed, rotated on use, revocable). `JwtAuthGuard`/`OptionalJwtAuthGuard` applied explicitly per route via `@UseGuards()` — no global guard.
 - **Roles**: `manager`, `client`, `delivery_person` (`UserRole` enum). Role never comes from a request body.
 - **Authorization**: CASL, one `CaslAbilityFactory` (`src/casl/`) building an `AppAbility` per request from the authenticated user's role. `@CheckPolicies(...)` + `PoliciesGuard`, applied **per-method, never at the controller class level** (see `decisions.md` — a real bug shipped from getting this wrong once).
-- Current `AppSubject` union covers `Category | Product | Sku | Cart`. Extending it for `Order`, `PromoCode` is pending work (see below) — the `delivery_person` role's `orders` read ability needs to cover both `shipped` and `delivered`, per `database/README.md` §5's own flagged note. `Cart` is client-only: neither `manager` nor `delivery_person` gets any ability on it, not even read (see `decisions.md`).
+- Current `AppSubject` union covers `Category | Product | Sku | Cart | Like`. Extending it for `Order`, `PromoCode` is pending work (see below) — the `delivery_person` role's `orders` read ability needs to cover both `shipped` and `delivered`, per `database/README.md` §5's own flagged note. `Cart` and `Like` are client-only: neither `manager` nor `delivery_person` gets any ability on either, not even read (see `decisions.md`).
 
 ## Data layer
 
@@ -65,7 +65,7 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 | `catalog/skus` | Done | SKU CRUD, restock (delta-based) |
 | `storage`, `mail`, `casl`, `common`, `config`, `prisma` | Done | shared infrastructure |
 | `cart` | Done | cart + cart items, SKU-scoped, live pricing (client-only) |
-| `likes` | Pending | product likes — feeds the notification recipient list |
+| `likes` | Done | product likes (client-only) — feeds the notification recipient list |
 | `promos` | Pending | promo code CRUD + validation, atomic redemption/release |
 | `orders` | Pending | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock |
 | `payments` | Pending | Stripe Payment Intent (cart) + Payment Link (single-SKU), webhook handling, stock Fulfil/Direct-sale |

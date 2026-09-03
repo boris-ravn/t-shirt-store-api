@@ -1,9 +1,9 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 //
-// Week 3 slice: only the tables auth/catalog/skus need.
-// The rest of docs/database/erd.dbml (cart, promos, orders, payments,
-// notifications) is added incrementally as those features are designed.
+// Modeled incrementally (decisions.md, 2026-08-28): only the tables the
+// current slice needs. The rest of docs/database/erd.dbml (promos, orders,
+// payments, notifications) is added as those features land.
 
 generator client {
   provider = "prisma-client"
@@ -42,6 +42,7 @@ model User {
 
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
+  cart                Cart?
 
   @@map("users")
 }
@@ -133,9 +134,41 @@ model Sku {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  product Product @relation(fields: [productId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id])
+  cartItems CartItem[]
 
   @@unique([productId, size, color])
   @@index([productId])
   @@map("skus")
+}
+
+// ---------------------------------------------------------------- cart
+
+model Cart {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user  User       @relation(fields: [userId], references: [id])
+  items CartItem[]
+
+  @@map("carts")
+}
+
+// No price snapshot, unlike order_items — the price always reflects the
+// SKU's current value.
+model CartItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId    String   @map("cart_id") @db.Uuid
+  skuId     String   @map("sku_id") @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  cart Cart @relation(fields: [cartId], references: [id])
+  sku  Sku  @relation(fields: [skuId], references: [id])
+
+  @@unique([cartId, skuId])
+  @@map("cart_items")
 }

@@ -4,8 +4,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ImageUrlService } from '../storage/image-url.service';
 import { CartService } from './cart.service';
 
-// Scaffold: fixtures/mocks are wired up, assertions are TODOs for the
-// dedicated testing pass (IMPLEMENTATION_PLAN.md, Slice 1).
 describe('CartService', () => {
   let service: CartService;
   let prisma: {
@@ -92,10 +90,28 @@ describe('CartService', () => {
 
       const result = await service.getOrCreate(userId);
 
-      // TODO(testing agent): assert prisma.cart.create was called with
-      // { data: { userId }, include: <CART_INCLUDE shape> }, and that the
-      // returned CartResponseDto has items: [] and subtotal 0 USD.
-      void result;
+      expect(prisma.cart.create).toHaveBeenCalledWith({
+        data: { userId },
+        include: {
+          items: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              sku: {
+                include: {
+                  product: {
+                    include: {
+                      images: { orderBy: { position: 'asc' }, take: 1 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(result.id).toBe(cartId);
+      expect(result.items).toEqual([]);
+      expect(result.subtotal).toEqual({ amount: 0, currency: 'USD' });
     });
 
     it('returns the existing cart without creating a new one', async () => {
@@ -103,11 +119,31 @@ describe('CartService', () => {
 
       const result = await service.getOrCreate(userId);
 
-      // TODO(testing agent): assert prisma.cart.create was NOT called, and
-      // the returned DTO's items/subtotal/product.imageUrl are derived
-      // correctly from cartWithItem's fixture (subtotal = 1999 * 2, product
-      // imageUrl built via imageUrlService.buildUrl(s3Key)).
-      void result;
+      expect(prisma.cart.create).not.toHaveBeenCalled();
+      expect(result.items).toHaveLength(1);
+      const expectedLineTotal = {
+        amount: activeSku.price * cartItemFixture.quantity,
+        currency: 'USD',
+      };
+      expect(result.subtotal).toEqual(expectedLineTotal);
+      const [item] = result.items;
+      expect(item.lineTotal).toEqual(expectedLineTotal);
+      expect(item.availableQuantity).toBe(
+        activeSku.stock - activeSku.reservedStock,
+      );
+      expect(item.sku.price).toEqual({
+        amount: activeSku.price,
+        currency: 'USD',
+      });
+      expect(item.sku.availableQuantity).toBe(
+        activeSku.stock - activeSku.reservedStock,
+      );
+      expect(item.product.imageUrl).toBe(
+        `https://cdn.example/${activeSku.product.images[0].s3Key}`,
+      );
+      expect(imageUrlService.buildUrl).toHaveBeenCalledWith(
+        activeSku.product.images[0].s3Key,
+      );
     });
   });
 
@@ -121,7 +157,7 @@ describe('CartService', () => {
       await expect(service.addItem(userId, dto)).rejects.toBeInstanceOf(
         NotFoundException,
       );
-      // TODO(testing agent): assert prisma.cartItem.upsert was NOT called.
+      expect(prisma.cartItem.upsert).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when the SKU is soft-deleted', async () => {
@@ -155,13 +191,16 @@ describe('CartService', () => {
 
       const result = await service.addItem(userId, dto);
 
-      // TODO(testing agent): assert prisma.cartItem.upsert was called with
-      // where: { cartId_skuId: { cartId: cartWithItem.id, skuId: dto.skuId } },
-      // create: { cartId, skuId, quantity: dto.quantity },
-      // update: { quantity: { increment: dto.quantity } } — this is the one
-      // Prisma compound-key shape to double-check against the generated
-      // client (src/generated/prisma/models/CartItem.ts) rather than assume.
-      void result;
+      expect(prisma.cartItem.upsert).toHaveBeenCalledWith({
+        where: { cartId_skuId: { cartId: cartWithItem.id, skuId: dto.skuId } },
+        create: {
+          cartId: cartWithItem.id,
+          skuId: dto.skuId,
+          quantity: dto.quantity,
+        },
+        update: { quantity: { increment: dto.quantity } },
+      });
+      expect(result.items).toHaveLength(1);
     });
   });
 
@@ -175,7 +214,7 @@ describe('CartService', () => {
       await expect(
         service.updateItem(userId, cartItemFixture.id, { quantity: 3 }),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TODO(testing agent): assert prisma.cartItem.update was NOT called.
+      expect(prisma.cartItem.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when the item does not exist', async () => {
@@ -198,10 +237,11 @@ describe('CartService', () => {
         quantity: 3,
       });
 
-      // TODO(testing agent): assert prisma.cartItem.update was called with
-      // { where: { id: cartItemFixture.id }, data: { quantity: 3 } } —
-      // absolute, matching UpdateCartItemRequestDto's contract, no increment.
-      void result;
+      expect(prisma.cartItem.update).toHaveBeenCalledWith({
+        where: { id: cartItemFixture.id },
+        data: { quantity: 3 },
+      });
+      expect(result.items).toHaveLength(1);
     });
   });
 
@@ -215,7 +255,7 @@ describe('CartService', () => {
       await expect(
         service.removeItem(userId, cartItemFixture.id),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TODO(testing agent): assert prisma.cartItem.delete was NOT called.
+      expect(prisma.cartItem.delete).not.toHaveBeenCalled();
     });
 
     it('deletes the item when it belongs to the caller', async () => {
@@ -226,8 +266,9 @@ describe('CartService', () => {
 
       await service.removeItem(userId, cartItemFixture.id);
 
-      // TODO(testing agent): assert prisma.cartItem.delete was called with
-      // { where: { id: cartItemFixture.id } }.
+      expect(prisma.cartItem.delete).toHaveBeenCalledWith({
+        where: { id: cartItemFixture.id },
+      });
     });
   });
 
@@ -237,10 +278,10 @@ describe('CartService', () => {
 
       await service.clear(userId);
 
-      // TODO(testing agent): assert prisma.cartItem.deleteMany was called
-      // with { where: { cartId: cartWithItem.id } }, and that no method on
-      // prisma.cart itself (beyond the lookup) was ever called — the cart
-      // row survives, only its items are removed.
+      expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
+        where: { cartId: cartWithItem.id },
+      });
+      expect(prisma.cart.create).not.toHaveBeenCalled();
     });
   });
 });

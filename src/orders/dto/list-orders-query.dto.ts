@@ -15,9 +15,8 @@ import { OrderStatus } from '../../generated/prisma/enums';
 const SORT_VALUES = ['createdAt', '-createdAt'] as const;
 type SortValue = (typeof SORT_VALUES)[number];
 
-// A single repeated query key (?status=paid) parses as a plain string, not
-// a one-element array — normalized here so @IsArray() sees the same shape
-// regardless of how many values were given.
+// A single query value (?status=paid) parses as a plain string, not a
+// one-element array — normalized so @IsArray() always sees an array.
 function toArray({ value }: { value: unknown }): unknown {
   if (value === undefined) {
     return undefined;

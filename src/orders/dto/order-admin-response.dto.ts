@@ -44,10 +44,6 @@ class OrderAdminPromoCodeResponseDto {
   code!: string;
 }
 
-// A subclass, unlike ProductAdminResponseDto — safe only because no field
-// changes type between the two (ProductAdminResponseDto's `skus` does).
-// `promoCode` is joined through promoCodeId, correct only because
-// PromoCode.code is immutable after creation.
 export class OrderAdminResponseDto extends OrderResponseDto {
   @ApiProperty({ type: OrderAdminUserResponseDto })
   user!: OrderAdminUserResponseDto;

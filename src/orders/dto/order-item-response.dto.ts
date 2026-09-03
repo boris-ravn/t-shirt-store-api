@@ -12,7 +12,6 @@ interface OrderItemEntity {
   unitPrice: number;
 }
 
-// A snapshot at purchase time — never re-resolved through products or skus.
 export class OrderItemResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

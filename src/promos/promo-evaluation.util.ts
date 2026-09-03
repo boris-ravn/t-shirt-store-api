@@ -9,8 +9,6 @@ export interface EvaluablePromoCode {
   minPurchaseAmount: number | null;
 }
 
-// Shared by PromosService.validate() and OrdersService.createOrder() — one
-// source of truth for the four rejection reasons the contract defines.
 export function evaluatePromoCode(
   promo: EvaluablePromoCode | null,
   subtotal: number,

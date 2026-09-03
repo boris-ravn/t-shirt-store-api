@@ -239,10 +239,6 @@ enum OrderStatus {
   @@map("order_status")
 }
 
-// Stock transitions (Reserve/Fulfil/Release/Restock/Direct-sale) and the
-// promo_codes.times_redeemed guard are raw guarded UPDATEs, not expressible
-// as Prisma filters (WHERE stock - reserved_stock >= qty compares two
-// columns of the same row) — see docs/database/README.md §8.
 model Order {
   id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String      @map("user_id") @db.Uuid
@@ -267,8 +263,6 @@ model Order {
   @@map("orders")
 }
 
-// Full snapshot (unitPrice, productName, size, color) — preserves the
-// purchase's historical truth regardless of later catalog changes.
 model OrderItem {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId     String   @map("order_id") @db.Uuid
@@ -291,8 +285,6 @@ model OrderItem {
   @@map("order_items")
 }
 
-// Snapshotted from the payment webhook (Slice 5) — an unpaid order has no
-// row here. order_id as PK enforces the 1:1 relationship.
 model OrderShippingDetails {
   orderId       String   @id @map("order_id") @db.Uuid
   recipientName String   @map("recipient_name")
@@ -310,9 +302,7 @@ model OrderShippingDetails {
   @@map("order_shipping_details")
 }
 
-// createdAt uses clock_timestamp(), not now(): several rows can be inserted
-// in the same transaction (e.g. cancel's status update + this row), and
-// now() would give them all the same timestamp, losing the real event order.
+// clock_timestamp(), not now() — see docs/database/README.md §5.
 model OrderStatusHistory {
   id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId   String      @map("order_id") @db.Uuid

@@ -121,9 +121,6 @@ export class OrdersService {
           WHERE id = ${promo.id} AND is_active AND expires_at > now() AND times_redeemed < usage_limit
         `;
         if (affected === 0) {
-          // The upfront evaluatePromoCode() call is a fast-path only — this
-          // guard is the real check, so re-evaluate against a fresh read to
-          // report the specific reason it lost the race.
           const fresh = await tx.promoCode.findUniqueOrThrow({
             where: { id: promo.id },
           });
@@ -375,10 +372,6 @@ export class OrdersService {
     };
   }
 
-  // No transition is a plain update — every one is claimed via a guarded
-  // updateMany (data written only if the current status still matches
-  // `from`), same pattern as cancelOrder, so a concurrent double-call can't
-  // both succeed.
   private async transition(
     orderId: string,
     from: OrderStatus,
@@ -409,10 +402,6 @@ export class OrdersService {
     });
   }
 
-  // Client: only their own orders. Manager: everything. Delivery person:
-  // shipped orders (any), or orders they personally marked delivered —
-  // narrowing to shipped alone would make their own delivery history
-  // unreadable, since a delivered order is no longer shipped.
   private visibilityWhere(user: AuthenticatedUser): Prisma.OrderWhereInput {
     if (user.role === UserRole.manager) {
       return {};

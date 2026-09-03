@@ -1,4 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  isRecordNotFound,
+  isUniqueConstraintViolation,
+} from '../prisma/prisma-error.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageUrlService } from '../storage/image-url.service';
 import { AddCartItemRequestDto } from './dto/add-cart-item-request.dto';
@@ -59,17 +63,31 @@ export class CartService {
   ): Promise<CartResponseDto> {
     await this.getOwnCartItemOrThrow(userId, cartItemId);
 
-    await this.prisma.cartItem.update({
-      where: { id: cartItemId },
-      data: { quantity: dto.quantity },
-    });
+    try {
+      await this.prisma.cartItem.update({
+        where: { id: cartItemId },
+        data: { quantity: dto.quantity },
+      });
+    } catch (error) {
+      if (!isRecordNotFound(error)) {
+        throw error;
+      }
+      throw new NotFoundException();
+    }
 
     return this.getOrCreate(userId);
   }
 
   async removeItem(userId: string, cartItemId: string): Promise<void> {
     await this.getOwnCartItemOrThrow(userId, cartItemId);
-    await this.prisma.cartItem.delete({ where: { id: cartItemId } });
+    try {
+      await this.prisma.cartItem.delete({ where: { id: cartItemId } });
+    } catch (error) {
+      if (!isRecordNotFound(error)) {
+        throw error;
+      }
+      throw new NotFoundException();
+    }
   }
 
   async clear(userId: string): Promise<void> {
@@ -85,10 +103,23 @@ export class CartService {
     if (existing) {
       return existing;
     }
-    return this.prisma.cart.create({
-      data: { userId },
-      include: CART_INCLUDE,
-    });
+
+    try {
+      return await this.prisma.cart.create({
+        data: { userId },
+        include: CART_INCLUDE,
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) {
+        throw error;
+      }
+      // Lost a create-vs-create race on the unique userId — the winner's
+      // row already exists, so read it instead of failing this request.
+      return this.prisma.cart.findUniqueOrThrow({
+        where: { userId },
+        include: CART_INCLUDE,
+      });
+    }
   }
 
   // 404, not 403: another user's cart item existing is not disclosed.

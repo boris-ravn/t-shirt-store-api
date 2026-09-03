@@ -86,6 +86,10 @@ Classic Prisma exposes which unique constraint fired via `error.meta.target: str
 
 The challenge only ever lists cart management under Client capabilities — there's no requirement for a manager to inspect another user's cart (unlike orders, which managers explicitly need to see). Granting `read` "just in case, for support" would be authorization scope creep with no requirement behind it, so `CaslAbilityFactory` gives `manager` nothing on `Cart` at all: the route falls through to `PoliciesGuard`'s existing 403 fallback exactly like a role with no matching policy handler. If a support/admin cart-read need shows up later, it's a new requirement to design against, not something to have pre-granted.
 
+### 2026-09-03 — `unlike` only requires the product to exist, not to be active; `like` requires both
+
+Found by manual testing, not code review: an early version gated both `like` and `unlike` behind the same "visible to a client" check (active, not soft-deleted) as `ProductsService.getById`. That stranded a like permanently once a manager disabled the product — `unlike` isn't a catalog-browsing action, it's a client removing their own state, and disabling is explicitly a reversible toggle (`database/README.md` §2), not a reason to lock a client out of their own data. `unlike` now only 404s when the product is gone entirely (soft-deleted or never existed); `like` still requires `active`, since liking something a client can't even browse to find would be a bigger inconsistency than the one this fixes. `Like` joins `Cart` as a client-only CASL subject — see the entry above.
+
 ### 2026-08-28 — Password-change email is synchronous; BullMQ arrives with the stock-notification job
 
 `MailService` (nodemailer → local Mailhog) is called directly and awaited — no queue in front of it. BullMQ/Redis is deferred to the feature that actually needs asynchronous, retryable delivery (stock notifications); a single non-critical email didn't justify standing up the infra early.

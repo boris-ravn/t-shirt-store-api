@@ -140,6 +140,7 @@ describe('OrdersService', () => {
     prisma.$transaction.mockImplementation(
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );
+    prisma.cartItem.deleteMany.mockResolvedValue({ count: 1 });
     cartService = { getOrCreate: jest.fn() };
 
     const module = await Test.createTestingModule({
@@ -290,10 +291,24 @@ describe('OrdersService', () => {
         },
       });
       expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
-        where: { cartId: cartWithOneItem.id },
+        where: {
+          id: { in: cartWithOneItem.items.map((item) => item.id) },
+          cartId: cartWithOneItem.id,
+        },
       });
       expect(result).not.toHaveProperty('user');
       expect(result).not.toHaveProperty('promoCode');
+    });
+
+    it('throws CartEmptyException, not InsufficientStockException, when a concurrent checkout already claimed the same cart items', async () => {
+      cartService.getOrCreate.mockResolvedValue(cartWithOneItem);
+      prisma.cartItem.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.createOrder(clientUser, {})).rejects.toBeInstanceOf(
+        CartEmptyException,
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.order.create).not.toHaveBeenCalled();
     });
   });
 

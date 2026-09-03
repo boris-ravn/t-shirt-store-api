@@ -5,8 +5,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ImageUrlService } from '../storage/image-url.service';
 import { LikesService } from './likes.service';
 
-// Scaffold: fixtures/mocks are wired up, assertions are TODOs for the
-// dedicated testing pass (matches the cart slice's workflow).
 describe('LikesService', () => {
   let service: LikesService;
   let prisma: {
@@ -105,10 +103,11 @@ describe('LikesService', () => {
 
       await service.like(userId, productId);
 
-      // TODO(testing agent): assert prisma.like.upsert was called with
-      // where: { userId_productId: { userId, productId } }, create: { userId,
-      // productId }, update: {} — this is the compound-key shape to verify
-      // against the generated Prisma client (src/generated/prisma/models/Like.ts).
+      expect(prisma.like.upsert).toHaveBeenCalledWith({
+        where: { userId_productId: { userId, productId } },
+        create: { userId, productId },
+        update: {},
+      });
     });
   });
 
@@ -126,11 +125,10 @@ describe('LikesService', () => {
       prisma.product.findUnique.mockResolvedValue(activeProduct);
       prisma.like.deleteMany.mockResolvedValue({ count: 0 });
 
-      await service.unlike(userId, productId);
-
-      // TODO(testing agent): assert prisma.like.deleteMany was called with
-      // { where: { userId, productId } }, and that it resolving with count: 0
-      // (no matching row) does not throw.
+      await expect(service.unlike(userId, productId)).resolves.toBeUndefined();
+      expect(prisma.like.deleteMany).toHaveBeenCalledWith({
+        where: { userId, productId },
+      });
     });
 
     it('succeeds on a disabled product, unlike like() — a disable must not strand an existing like', async () => {
@@ -140,9 +138,7 @@ describe('LikesService', () => {
       });
       prisma.like.deleteMany.mockResolvedValue({ count: 1 });
 
-      await expect(
-        service.unlike(userId, productId),
-      ).resolves.toBeUndefined();
+      await expect(service.unlike(userId, productId)).resolves.toBeUndefined();
       expect(prisma.like.deleteMany).toHaveBeenCalledWith({
         where: { userId, productId },
       });
@@ -158,12 +154,36 @@ describe('LikesService', () => {
 
       const result = await service.listLikedProducts(userId, query);
 
-      // TODO(testing agent): assert prisma.like.findMany was called with
-      // where: { userId, product: { deletedAt: null, status: 'active' } },
-      // orderBy: { createdAt: 'desc' }, skip/take from query; assert the
-      // result's data maps to ProductResponseDto shape (not raw Like rows)
-      // and meta.total/limit/offset match.
-      void result;
+      expect(prisma.like.findMany).toHaveBeenCalledWith({
+        where: {
+          userId,
+          product: { deletedAt: null, status: ProductStatus.active },
+        },
+        include: {
+          product: {
+            include: {
+              images: { orderBy: { position: 'asc' } },
+              skus: { where: { deletedAt: null } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: query.offset,
+        take: query.limit,
+      });
+      expect(result.data).toHaveLength(1);
+      // The product, not the like row — likeFixture.id ('like-1') must not
+      // leak into the response.
+      expect(result.data[0].id).toBe(activeProduct.id);
+      expect(result.data[0].name).toBe(activeProduct.name);
+      expect(result.data[0].images[0].url).toBe(
+        `https://cdn.example/${activeProduct.images[0].s3Key}`,
+      );
+      expect(result.meta).toEqual({
+        total: 1,
+        limit: query.limit,
+        offset: query.offset,
+      });
     });
 
     it('excludes products that became disabled or soft-deleted after being liked', async () => {
@@ -172,11 +192,20 @@ describe('LikesService', () => {
 
       const result = await service.listLikedProducts(userId, query);
 
-      // TODO(testing agent): assert the where clause's product filter
-      // (status: active, deletedAt: null) is what excludes these — this
-      // test only proves the empty-result plumbing, not the filter itself,
-      // since the filter lives in the Prisma call the mock intercepts.
-      void result;
+      expect(prisma.like.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId,
+            product: { deletedAt: null, status: ProductStatus.active },
+          },
+        }),
+      );
+      expect(result.data).toEqual([]);
+      expect(result.meta).toEqual({
+        total: 0,
+        limit: query.limit,
+        offset: query.offset,
+      });
     });
   });
 });

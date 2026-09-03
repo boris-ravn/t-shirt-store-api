@@ -1,13 +1,39 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageUrlService } from '../storage/image-url.service';
 import { CartService } from './cart.service';
 
+// Same shape as the P2002 fixtures in skus.service.spec.ts — a real
+// PrismaClientKnownRequestError, not a plain object, since isUniqueConstraintViolation/
+// isRecordNotFound check `instanceof`.
+const cartUserIdConflict = new Prisma.PrismaClientKnownRequestError(
+  'Unique constraint failed',
+  {
+    code: 'P2002',
+    clientVersion: '7.10.0',
+    meta: {
+      driverAdapterError: {
+        cause: { constraint: { index: 'carts_user_id_key' } },
+      },
+    },
+  },
+);
+
+const recordNotFoundError = new Prisma.PrismaClientKnownRequestError(
+  'An operation failed because it depends on one or more records that were required but not found.',
+  { code: 'P2025', clientVersion: '7.10.0' },
+);
+
 describe('CartService', () => {
   let service: CartService;
   let prisma: {
-    cart: { findUnique: jest.Mock; create: jest.Mock };
+    cart: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+    };
     cartItem: {
       upsert: jest.Mock;
       update: jest.Mock;
@@ -58,7 +84,11 @@ describe('CartService', () => {
 
   beforeEach(async () => {
     prisma = {
-      cart: { findUnique: jest.fn(), create: jest.fn() },
+      cart: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
       cartItem: {
         upsert: jest.fn(),
         update: jest.fn(),
@@ -144,6 +174,19 @@ describe('CartService', () => {
       expect(imageUrlService.buildUrl).toHaveBeenCalledWith(
         activeSku.product.images[0].s3Key,
       );
+    });
+
+    it('recovers when cart creation loses a race on the unique userId', async () => {
+      prisma.cart.findUnique.mockResolvedValue(null);
+      prisma.cart.create.mockRejectedValue(cartUserIdConflict);
+      prisma.cart.findUniqueOrThrow.mockResolvedValue(emptyCart);
+
+      const result = await service.getOrCreate(userId);
+
+      // TODO(testing agent): assert prisma.cart.findUniqueOrThrow was called
+      // with { where: { userId }, include: <CART_INCLUDE shape> }, and that
+      // the P2002 from create() did not bubble up as an unhandled error.
+      void result;
     });
   });
 
@@ -243,6 +286,20 @@ describe('CartService', () => {
       });
       expect(result.items).toHaveLength(1);
     });
+
+    it('throws NotFoundException when the item was removed between the ownership check and the update (P2025)', async () => {
+      prisma.cartItem.findUnique.mockResolvedValue({
+        ...cartItemFixture,
+        cart: { userId },
+      });
+      prisma.cartItem.update.mockRejectedValue(recordNotFoundError);
+
+      await expect(
+        service.updateItem(userId, cartItemFixture.id, { quantity: 3 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      // TODO(testing agent): assert the getOrCreate() refresh (a further
+      // prisma.cart.findUnique call) never runs after this rejection.
+    });
   });
 
   describe('removeItem', () => {
@@ -269,6 +326,18 @@ describe('CartService', () => {
       expect(prisma.cartItem.delete).toHaveBeenCalledWith({
         where: { id: cartItemFixture.id },
       });
+    });
+
+    it('throws NotFoundException when the item was already removed by a concurrent call (P2025)', async () => {
+      prisma.cartItem.findUnique.mockResolvedValue({
+        ...cartItemFixture,
+        cart: { userId },
+      });
+      prisma.cartItem.delete.mockRejectedValue(recordNotFoundError);
+
+      await expect(
+        service.removeItem(userId, cartItemFixture.id),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

@@ -30,6 +30,17 @@ interface AuthSessionBody {
   user: { id: string };
 }
 
+interface OrderBody {
+  id: string;
+  status: string;
+  total: { amount: number; currency: string };
+}
+
+interface OrderListBody {
+  data: OrderBody[];
+  meta: { total: number; limit: number; offset: number };
+}
+
 // Real Postgres via Testcontainers, same setup as auth.e2e-spec.ts. Orders
 // are seeded directly via Prisma in various statuses/totals/createdAt —
 // bypassing cart → checkout → payment entirely, since this suite is about
@@ -186,10 +197,19 @@ describe('Order history (e2e)', () => {
       .get('/v1/orders')
       .set('Authorization', `Bearer ${clientAToken}`);
 
-    // TODO(testing agent): assert response.status === 200, body.meta.total
-    // === 3 (not 4 — clientB's order excluded), and the three returned ids
-    // all belong to clientA, ordered by createdAt descending.
-    void response;
+    expect(response.status).toBe(200);
+    const body = response.body as OrderListBody;
+    expect(body.meta.total).toBe(3);
+
+    const clientAOrders = await prisma.order.findMany({
+      where: { userId: clientAId },
+    });
+    expect(body.data.map((order) => order.id).sort()).toEqual(
+      clientAOrders.map((order) => order.id).sort(),
+    );
+
+    const totals = body.data.map((order) => order.total.amount);
+    expect(totals).toEqual([3000, 2000, 1000]);
   });
 
   it('filters by status', async () => {
@@ -198,9 +218,11 @@ describe('Order history (e2e)', () => {
       .query({ status: OrderStatus.paid })
       .set('Authorization', `Bearer ${clientAToken}`);
 
-    // TODO(testing agent): assert only the `paid` order (total 2000) comes
-    // back.
-    void response;
+    expect(response.status).toBe(200);
+    const body = response.body as OrderListBody;
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].status).toBe(OrderStatus.paid);
+    expect(body.data[0].total.amount).toBe(2000);
   });
 
   it('filters by date range (createdFrom/createdTo)', async () => {
@@ -212,10 +234,12 @@ describe('Order history (e2e)', () => {
       .query({ createdFrom })
       .set('Authorization', `Bearer ${clientAToken}`);
 
-    // TODO(testing agent): assert only the two orders created within the
-    // last 6 days (paid, shipped) come back — the 10-days-ago pending order
-    // is excluded.
-    void response;
+    expect(response.status).toBe(200);
+    const body = response.body as OrderListBody;
+    const totals = body.data
+      .map((order) => order.total.amount)
+      .sort((a, b) => a - b);
+    expect(totals).toEqual([2000, 3000]);
   });
 
   it('filters by price range (minTotal/maxTotal)', async () => {
@@ -224,8 +248,10 @@ describe('Order history (e2e)', () => {
       .query({ minTotal: 1500, maxTotal: 2500 })
       .set('Authorization', `Bearer ${clientAToken}`);
 
-    // TODO(testing agent): assert only the 2000-total order comes back.
-    void response;
+    expect(response.status).toBe(200);
+    const body = response.body as OrderListBody;
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].total.amount).toBe(2000);
   });
 
   it('paginates with limit/offset', async () => {
@@ -238,10 +264,16 @@ describe('Order history (e2e)', () => {
       .query({ limit: 2, offset: 2 })
       .set('Authorization', `Bearer ${clientAToken}`);
 
-    // TODO(testing agent): assert page1.body.data has 2 items, page2 has 1,
-    // meta.total is 3 on both, and no order id appears on both pages.
-    void page1;
-    void page2;
+    const body1 = page1.body as OrderListBody;
+    const body2 = page2.body as OrderListBody;
+    expect(body1.data).toHaveLength(2);
+    expect(body2.data).toHaveLength(1);
+    expect(body1.meta.total).toBe(3);
+    expect(body2.meta.total).toBe(3);
+
+    const page1Ids = body1.data.map((order) => order.id);
+    const page2Ids = body2.data.map((order) => order.id);
+    expect(page1Ids.some((id) => page2Ids.includes(id))).toBe(false);
   });
 
   it("404s, not 403s, when a client requests another client's order by id", async () => {
@@ -253,8 +285,6 @@ describe('Order history (e2e)', () => {
       .get(`/v1/orders/${clientBOrder.id}`)
       .set('Authorization', `Bearer ${clientAToken}`);
 
-    // TODO(testing agent): assert response.status === 404, matching the
-    // ownership-hiding rule (decisions.md / api CONVENTIONS.md).
-    void response;
+    expect(response.status).toBe(404);
   });
 });

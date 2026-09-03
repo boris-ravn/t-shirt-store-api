@@ -183,10 +183,27 @@ describe('CartService', () => {
 
       const result = await service.getOrCreate(userId);
 
-      // TODO(testing agent): assert prisma.cart.findUniqueOrThrow was called
-      // with { where: { userId }, include: <CART_INCLUDE shape> }, and that
-      // the P2002 from create() did not bubble up as an unhandled error.
-      void result;
+      expect(prisma.cart.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { userId },
+        include: {
+          items: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              sku: {
+                include: {
+                  product: {
+                    include: {
+                      images: { orderBy: { position: 'asc' }, take: 1 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(result.id).toBe(cartId);
+      expect(result.items).toEqual([]);
     });
   });
 
@@ -297,8 +314,7 @@ describe('CartService', () => {
       await expect(
         service.updateItem(userId, cartItemFixture.id, { quantity: 3 }),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TODO(testing agent): assert the getOrCreate() refresh (a further
-      // prisma.cart.findUnique call) never runs after this rejection.
+      expect(prisma.cart.findUnique).not.toHaveBeenCalled();
     });
   });
 

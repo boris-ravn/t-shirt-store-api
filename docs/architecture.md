@@ -51,7 +51,7 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 ## Testing strategy
 
 - **Unit** (`*.service.spec.ts`): mock `PrismaService`, assert on branch logic (which exception fires, which fields get written, role-based visibility). Standard NestJS testing-module pattern.
-- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out) and order history (role-scoped listing, filters, pagination, ownership 404) — the latter seeds orders directly via Prisma rather than through checkout, since a real `paid` order needs Slice 5's payment webhook. Checkout e2e (cart → order → payment → `paid`) lands with that slice.
+- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out); order history (role-scoped listing, filters, pagination, ownership 404), seeding orders directly via Prisma rather than through checkout since a real `paid` order needs Slice 5's payment webhook; and checkout (cart → pending order reservation, cancel-from-pending release, and a concurrent-double-checkout regression test — real Postgres is what makes that last one meaningful, a mocked-Prisma unit test can't exercise real transaction concurrency). The `pending → paid` leg (cart → order → payment → `paid`) lands with Slice 5.
 - Root `CLAUDE.md`'s rule: don't write assertions for code written in the same session: offer the mocking setup, let the reasoning happen in review.
 
 ## Module map

@@ -79,37 +79,46 @@ describe('CaslAbilityFactory', () => {
     });
   });
 
-  describe('Cart (client-only subject)', () => {
-    const allActions: AppAction[] = [
-      'manage',
-      'create',
-      'read',
-      'update',
-      'delete',
-    ];
+  describe.each(['Cart', 'Like'] as AppSubject[])(
+    '%s (client-only subject)',
+    (clientOnlySubject) => {
+      const allActions: AppAction[] = [
+        'manage',
+        'create',
+        'read',
+        'update',
+        'delete',
+      ];
 
-    it('client can manage Cart', () => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.client,
+      it(`client can manage ${clientOnlySubject}`, () => {
+        const ability = factory.createForUser({
+          id: 'user-1',
+          role: UserRole.client,
+        });
+        expect(ability.can('manage', clientOnlySubject)).toBe(true);
       });
-      expect(ability.can('manage', 'Cart')).toBe(true);
-    });
 
-    it.each(allActions)('manager cannot %s Cart', (action) => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.manager,
-      });
-      expect(ability.cannot(action, 'Cart')).toBe(true);
-    });
+      it.each(allActions)(
+        `manager cannot %s ${clientOnlySubject}`,
+        (action) => {
+          const ability = factory.createForUser({
+            id: 'user-1',
+            role: UserRole.manager,
+          });
+          expect(ability.cannot(action, clientOnlySubject)).toBe(true);
+        },
+      );
 
-    it.each(allActions)('delivery_person cannot %s Cart', (action) => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.delivery_person,
-      });
-      expect(ability.cannot(action, 'Cart')).toBe(true);
-    });
-  });
+      it.each(allActions)(
+        `delivery_person cannot %s ${clientOnlySubject}`,
+        (action) => {
+          const ability = factory.createForUser({
+            id: 'user-1',
+            role: UserRole.delivery_person,
+          });
+          expect(ability.cannot(action, clientOnlySubject)).toBe(true);
+        },
+      );
+    },
+  );
 });

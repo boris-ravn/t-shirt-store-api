@@ -86,6 +86,10 @@ Classic Prisma exposes which unique constraint fired via `error.meta.target: str
 
 Found by manual testing, not code review: an early version gated both `like` and `unlike` behind the same "visible to a client" check (active, not soft-deleted) as `ProductsService.getById`. That stranded a like permanently once a manager disabled the product — `unlike` isn't a catalog-browsing action, it's a client removing their own state, and disabling is explicitly a reversible toggle (`database/README.md` §2), not a reason to lock a client out of their own data. `unlike` now only 404s when the product is gone entirely (soft-deleted or never existed); `like` still requires `active`, since liking something a client can't even browse to find would be a bigger inconsistency than the one this fixes.
 
+### 2026-09-03 — CASL's `'manage'` matches every action, including custom ones — a role with `manage` needs an explicit `cannot(...)` to keep a custom action off-limits
+
+Verified directly against the installed `@casl/ability`, not assumed: granting `can('manage', X)` makes `ability.can(<any action string>, X)` return `true`, including actions invented for this project (`apply`, and later `cancel`/`process`/`ship`/`deliver` on `Order`) — `manage` is a real wildcard, not shorthand for the five CRUD-ish actions used elsewhere. Caught because `PromoCode`'s manager grant silently also passed the client-only `apply` check; fixed with `cannot('apply', 'PromoCode')` right after the `can('manage', ...)` (confirmed `cannot`-after-`can` scopes to just that action). Check for this explicitly whenever a role gets `manage` on a subject that also has a custom action meant for a different role.
+
 ### 2026-08-28 — Password-change email is synchronous; BullMQ arrives with the stock-notification job
 
 `MailService` (nodemailer → local Mailhog) is called directly and awaited — no queue in front of it. BullMQ/Redis is deferred to the feature that actually needs asynchronous, retryable delivery (stock notifications); a single non-critical email didn't justify standing up the infra early.

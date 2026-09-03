@@ -44,6 +44,7 @@ model User {
   refreshTokens       RefreshToken[]
   cart                Cart?
   likes               Like[]
+  createdPromoCodes   PromoCode[]
 
   @@map("users")
 }
@@ -188,4 +189,34 @@ model Like {
   @@unique([userId, productId])
   @@index([productId])
   @@map("likes")
+}
+
+// ---------------------------------------------------------------- promotions
+
+enum DiscountType {
+  percentage
+  fixed_amount
+
+  @@map("discount_type")
+}
+
+// discount_value is a percentage (1-100) or minor units depending on
+// discount_type; range validated in the service layer, not a schema CHECK.
+model PromoCode {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code              String       @unique
+  discountType      DiscountType @map("discount_type")
+  discountValue     Int          @map("discount_value")
+  minPurchaseAmount Int?         @map("min_purchase_amount")
+  expiresAt         DateTime     @map("expires_at") @db.Timestamptz
+  usageLimit        Int          @map("usage_limit")
+  timesRedeemed     Int          @default(0) @map("times_redeemed")
+  isActive          Boolean      @default(true) @map("is_active")
+  createdBy         String       @map("created_by") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("promo_codes")
 }

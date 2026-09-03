@@ -121,4 +121,60 @@ describe('CaslAbilityFactory', () => {
       );
     },
   );
+
+  // PromoCode doesn't fit either pattern above: manager gets full manage
+  // (like Category/Product/Sku), but client only gets 'apply' — not 'read',
+  // unlike the client-can-read subjects, and not 'manage', unlike Cart/Like.
+  describe('PromoCode', () => {
+    const nonApplyActions: AppAction[] = [
+      'manage',
+      'create',
+      'read',
+      'update',
+      'delete',
+    ];
+
+    it('manager can manage PromoCode', () => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.manager,
+      });
+      expect(ability.can('manage', 'PromoCode')).toBe(true);
+    });
+
+    it('manager cannot apply PromoCode, despite manage', () => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.manager,
+      });
+      expect(ability.cannot('apply', 'PromoCode')).toBe(true);
+    });
+
+    it('client can apply PromoCode', () => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.client,
+      });
+      expect(ability.can('apply', 'PromoCode')).toBe(true);
+    });
+
+    it.each(nonApplyActions)('client cannot %s PromoCode', (action) => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.client,
+      });
+      expect(ability.cannot(action, 'PromoCode')).toBe(true);
+    });
+
+    it.each([...nonApplyActions, 'apply'] as AppAction[])(
+      'delivery_person cannot %s PromoCode',
+      (action) => {
+        const ability = factory.createForUser({
+          id: 'user-1',
+          role: UserRole.delivery_person,
+        });
+        expect(ability.cannot(action, 'PromoCode')).toBe(true);
+      },
+    );
+  });
 });

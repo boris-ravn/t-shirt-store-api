@@ -9,6 +9,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { validate } from './config/env.validation';
 import { LikesModule } from './likes/likes.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PromosModule } from './promos/promos.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     CatalogModule,
     CartModule,
     LikesModule,
+    PromosModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -43,8 +43,6 @@ export class CartService {
     const cart = await this.findOrCreateCart(userId);
     await this.assertSkuIsPurchasable(dto.skuId);
 
-    // Increments quantity if the SKU is already in the cart, per the
-    // (cartId, skuId) unique constraint (cart.yaml).
     await this.prisma.cartItem.upsert({
       where: { cartId_skuId: { cartId: cart.id, skuId: dto.skuId } },
       create: { cartId: cart.id, skuId: dto.skuId, quantity: dto.quantity },
@@ -93,8 +91,7 @@ export class CartService {
     });
   }
 
-  // 404, not 403 — another user's cart item existing is not disclosed
-  // (decisions.md's ownership rule).
+  // 404, not 403: another user's cart item existing is not disclosed.
   private async getOwnCartItemOrThrow(userId: string, cartItemId: string) {
     const item = await this.prisma.cartItem.findUnique({
       where: { id: cartItemId },

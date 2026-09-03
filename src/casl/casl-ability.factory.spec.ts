@@ -79,9 +79,6 @@ describe('CaslAbilityFactory', () => {
     });
   });
 
-  // Cart doesn't fit the Category/Product/Sku pattern above (manager manages,
-  // everyone else reads) — it's client-only, with no ability at all for the
-  // other two roles, so it gets its own describe block.
   describe('Cart (client-only subject)', () => {
     const allActions: AppAction[] = [
       'manage',

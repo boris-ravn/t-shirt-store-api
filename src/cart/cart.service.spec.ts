@@ -4,11 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ImageUrlService } from '../storage/image-url.service';
 import { CartService } from './cart.service';
 
-// Scaffolded per this repo's testing-agent workflow (IMPLEMENTATION_PLAN.md,
-// Slice 1): fixtures and mocks are wired up and each behavior is named as
-// its own test, but assertion bodies are left as TODOs for the dedicated
-// testing pass rather than written by the same session that wrote the
-// service — see the root CLAUDE.md's rule on this.
+// Scaffold: fixtures/mocks are wired up, assertions are TODOs for the
+// dedicated testing pass (IMPLEMENTATION_PLAN.md, Slice 1).
 describe('CartService', () => {
   let service: CartService;
   let prisma: {

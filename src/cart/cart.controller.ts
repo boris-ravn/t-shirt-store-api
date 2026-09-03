@@ -28,8 +28,6 @@ import { AddCartItemRequestDto } from './dto/add-cart-item-request.dto';
 import { CartResponseDto } from './dto/cart-response.dto';
 import { UpdateCartItemRequestDto } from './dto/update-cart-item-request.dto';
 
-// @CheckPolicies is applied per-method, never at class level — a class-level
-// decorator here would be read only as PoliciesGuard's fallback (decisions.md).
 @ApiTags('cart')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

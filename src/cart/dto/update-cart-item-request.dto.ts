@@ -1,8 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, Min } from 'class-validator';
 
-// Absolute, not a delta — quantity: 0 is a validation failure, deletion has
-// its own verb (removeCartItem).
+// Absolute, not a delta — removeCartItem is the verb for going to zero.
 export class UpdateCartItemRequestDto {
   @ApiProperty({ minimum: 1 })
   @IsInt()

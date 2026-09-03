@@ -27,9 +27,8 @@ export class CaslAbilityFactory {
       can('read', 'Product');
       can('read', 'Sku');
 
-      // Cart is client-only — a manager has no ability on it at all (not
-      // even read), and delivery_person falls through this branch too but
-      // gets nothing extra: neither role ever needs another user's cart.
+      // Cart is client-only — manager and delivery_person get no ability
+      // on it at all, not even read (decisions.md).
       if (user.role === UserRole.client) {
         can('manage', 'Cart');
       }

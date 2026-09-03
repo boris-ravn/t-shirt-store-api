@@ -156,8 +156,8 @@ model Cart {
   @@map("carts")
 }
 
-// No price snapshot: unlike order_items, the cart is transient state — the
-// price shown always reflects the SKU's current value (docs/database/README.md §3).
+// No price snapshot, unlike order_items — the price always reflects the
+// SKU's current value.
 model CartItem {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cartId    String   @map("cart_id") @db.Uuid

@@ -8,8 +8,6 @@ interface CartEntity {
   updatedAt: Date;
 }
 
-// Created on first read if the caller has none (see CartService.getOrCreate)
-// — this DTO never represents "no cart", only an empty one.
 export class CartResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

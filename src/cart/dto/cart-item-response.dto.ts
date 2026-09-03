@@ -17,17 +17,12 @@ interface CartItemProductEntity {
   images: { s3Key: string }[];
 }
 
-// Exported so CartResponseDto can type its own `items` field against exactly
-// what this DTO's fromEntity() accepts, without re-declaring the shape.
 export interface CartItemEntity {
   id: string;
   quantity: number;
   sku: CartItemSkuEntity & { product: CartItemProductEntity };
 }
 
-// Deliberately minimal (id, name, imageUrl) — not the full catalog
-// ProductResponseDto — matching CartItem's contract shape (cart.yaml), which
-// only needs enough to render a cart line, not the whole product.
 export class CartItemProductResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -39,8 +34,7 @@ export class CartItemProductResponseDto {
   imageUrl!: string | null;
 }
 
-// Every price here is read live from the SKU, not snapshotted — a cart's
-// subtotal can legitimately change between two reads (cart.yaml).
+// Prices are read live from the SKU, not snapshotted — unlike order_items.
 export class CartItemResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

@@ -8,9 +8,25 @@ import { UserRole } from '../generated/prisma/enums';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
 
 export type AppAction =
-  'manage' | 'create' | 'read' | 'update' | 'delete' | 'apply';
+  | 'manage'
+  | 'create'
+  | 'read'
+  | 'update'
+  | 'delete'
+  | 'apply'
+  | 'cancel'
+  | 'process'
+  | 'ship'
+  | 'deliver';
 export type AppSubject =
-  'Category' | 'Product' | 'Sku' | 'Cart' | 'Like' | 'PromoCode' | 'all';
+  | 'Category'
+  | 'Product'
+  | 'Sku'
+  | 'Cart'
+  | 'Like'
+  | 'PromoCode'
+  | 'Order'
+  | 'all';
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 @Injectable()
@@ -30,6 +46,10 @@ export class CaslAbilityFactory {
       // 'manage' matches every action, including custom ones like 'apply'
       // — this carve-out is not redundant (decisions.md).
       cannot('apply', 'PromoCode');
+      can('read', 'Order');
+      can('process', 'Order');
+      can('ship', 'Order');
+      can('cancel', 'Order');
     } else {
       can('read', 'Category');
       can('read', 'Product');
@@ -41,6 +61,14 @@ export class CaslAbilityFactory {
         can('manage', 'Cart');
         can('manage', 'Like');
         can('apply', 'PromoCode');
+        can('create', 'Order');
+        can('read', 'Order');
+        can('cancel', 'Order');
+      }
+
+      if (user.role === UserRole.delivery_person) {
+        can('read', 'Order');
+        can('deliver', 'Order');
       }
     }
 

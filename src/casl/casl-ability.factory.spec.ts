@@ -177,4 +177,89 @@ describe('CaslAbilityFactory', () => {
       },
     );
   });
+
+  // Order has a distinct action per role per docs/api's four-transition-
+  // endpoints design (decisions.md) — each role's exact allowed/denied set
+  // is asserted explicitly rather than derived from a shared list, since
+  // that's the whole point of granular actions over a blanket 'manage'.
+  describe('Order', () => {
+    const allActions: AppAction[] = [
+      'manage',
+      'create',
+      'read',
+      'update',
+      'delete',
+      'apply',
+      'cancel',
+      'process',
+      'ship',
+      'deliver',
+    ];
+
+    it.each(['read', 'process', 'ship', 'cancel'] as AppAction[])(
+      'manager can %s Order',
+      (action) => {
+        const ability = factory.createForUser({
+          id: 'user-1',
+          role: UserRole.manager,
+        });
+        expect(ability.can(action, 'Order')).toBe(true);
+      },
+    );
+
+    it.each(
+      allActions.filter(
+        (a) => !['read', 'process', 'ship', 'cancel'].includes(a),
+      ),
+    )('manager cannot %s Order', (action) => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.manager,
+      });
+      expect(ability.cannot(action, 'Order')).toBe(true);
+    });
+
+    it.each(['create', 'read', 'cancel'] as AppAction[])(
+      'client can %s Order',
+      (action) => {
+        const ability = factory.createForUser({
+          id: 'user-1',
+          role: UserRole.client,
+        });
+        expect(ability.can(action, 'Order')).toBe(true);
+      },
+    );
+
+    it.each(
+      allActions.filter((a) => !['create', 'read', 'cancel'].includes(a)),
+    )('client cannot %s Order', (action) => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.client,
+      });
+      expect(ability.cannot(action, 'Order')).toBe(true);
+    });
+
+    it.each(['read', 'deliver'] as AppAction[])(
+      'delivery_person can %s Order',
+      (action) => {
+        const ability = factory.createForUser({
+          id: 'user-1',
+          role: UserRole.delivery_person,
+        });
+        expect(ability.can(action, 'Order')).toBe(true);
+      },
+    );
+
+    it.each(allActions.filter((a) => !['read', 'deliver'].includes(a)))(
+      'delivery_person cannot %s Order',
+      (action) => {
+        const ability = factory.createForUser({
+          id: 'user-1',
+          role: UserRole.delivery_person,
+        });
+        expect(ability.cannot(action, 'Order')).toBe(true);
+      },
+    );
+  });
 });

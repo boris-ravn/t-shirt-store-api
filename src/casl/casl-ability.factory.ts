@@ -7,15 +7,18 @@ import {
 import { UserRole } from '../generated/prisma/enums';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
 
-export type AppAction = 'manage' | 'create' | 'read' | 'update' | 'delete';
+export type AppAction =
+  'manage' | 'create' | 'read' | 'update' | 'delete' | 'apply';
 export type AppSubject =
-  'Category' | 'Product' | 'Sku' | 'Cart' | 'Like' | 'all';
+  'Category' | 'Product' | 'Sku' | 'Cart' | 'Like' | 'PromoCode' | 'all';
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 @Injectable()
 export class CaslAbilityFactory {
   createForUser(user: AuthenticatedUser): AppAbility {
-    const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+    const { can, cannot, build } = new AbilityBuilder<AppAbility>(
+      createMongoAbility,
+    );
 
     if (user.role === UserRole.manager) {
       // Disable is a PATCH writing `status`, covered by `update` — not a
@@ -23,6 +26,11 @@ export class CaslAbilityFactory {
       can('manage', 'Category');
       can('manage', 'Product');
       can('manage', 'Sku');
+      can('manage', 'PromoCode');
+      // CASL's 'manage' matches every action, including custom ones — so
+      // without this, 'manage' would silently also grant 'apply', which is
+      // meant to be client-only (verified empirically, see decisions.md).
+      cannot('apply', 'PromoCode');
     } else {
       can('read', 'Category');
       can('read', 'Product');
@@ -33,6 +41,7 @@ export class CaslAbilityFactory {
       if (user.role === UserRole.client) {
         can('manage', 'Cart');
         can('manage', 'Like');
+        can('apply', 'PromoCode');
       }
     }
 

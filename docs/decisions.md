@@ -82,6 +82,10 @@ Consequence accepted: if a manager's role is downgraded, their old access token 
 
 Classic Prisma exposes which unique constraint fired via `error.meta.target: string[]`; this project's actual Postgres + `@prisma/adapter-pg` setup carries no such array — the constraint name lives at `meta.driverAdapterError.cause.constraint.index` instead (`uniqueConstraintIndexName` in `prisma-error.util.ts`). This will recur for every future unique-constraint-guarded write (promo code, Stripe IDs on `payments`) — verify the real error shape again rather than assume classic Prisma's docs apply here.
 
+### 2026-09-03 — `Cart` is a client-only CASL subject; `manager` gets no ability on it, not even `read`
+
+The challenge only ever lists cart management under Client capabilities — there's no requirement for a manager to inspect another user's cart (unlike orders, which managers explicitly need to see). Granting `read` "just in case, for support" would be authorization scope creep with no requirement behind it, so `CaslAbilityFactory` gives `manager` nothing on `Cart` at all: the route falls through to `PoliciesGuard`'s existing 403 fallback exactly like a role with no matching policy handler. If a support/admin cart-read need shows up later, it's a new requirement to design against, not something to have pre-granted.
+
 ### 2026-08-28 — Password-change email is synchronous; BullMQ arrives with the stock-notification job
 
 `MailService` (nodemailer → local Mailhog) is called directly and awaited — no queue in front of it. BullMQ/Redis is deferred to the feature that actually needs asynchronous, retryable delivery (stock notifications); a single non-critical email didn't justify standing up the infra early.

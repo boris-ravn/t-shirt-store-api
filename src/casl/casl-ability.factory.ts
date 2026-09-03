@@ -8,7 +8,7 @@ import { UserRole } from '../generated/prisma/enums';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
 
 export type AppAction = 'manage' | 'create' | 'read' | 'update' | 'delete';
-export type AppSubject = 'Category' | 'Product' | 'Sku' | 'all';
+export type AppSubject = 'Category' | 'Product' | 'Sku' | 'Cart' | 'all';
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 @Injectable()
@@ -26,6 +26,13 @@ export class CaslAbilityFactory {
       can('read', 'Category');
       can('read', 'Product');
       can('read', 'Sku');
+
+      // Cart is client-only — a manager has no ability on it at all (not
+      // even read), and delivery_person falls through this branch too but
+      // gets nothing extra: neither role ever needs another user's cart.
+      if (user.role === UserRole.client) {
+        can('manage', 'Cart');
+      }
     }
 
     return build();

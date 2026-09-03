@@ -78,4 +78,41 @@ describe('CaslAbilityFactory', () => {
       expect(ability.cannot(action, subject)).toBe(true);
     });
   });
+
+  // Cart doesn't fit the Category/Product/Sku pattern above (manager manages,
+  // everyone else reads) — it's client-only, with no ability at all for the
+  // other two roles, so it gets its own describe block.
+  describe('Cart (client-only subject)', () => {
+    const allActions: AppAction[] = [
+      'manage',
+      'create',
+      'read',
+      'update',
+      'delete',
+    ];
+
+    it('client can manage Cart', () => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.client,
+      });
+      expect(ability.can('manage', 'Cart')).toBe(true);
+    });
+
+    it.each(allActions)('manager cannot %s Cart', (action) => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.manager,
+      });
+      expect(ability.cannot(action, 'Cart')).toBe(true);
+    });
+
+    it.each(allActions)('delivery_person cannot %s Cart', (action) => {
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: UserRole.delivery_person,
+      });
+      expect(ability.cannot(action, 'Cart')).toBe(true);
+    });
+  });
 });

@@ -27,9 +27,8 @@ export class CaslAbilityFactory {
       can('manage', 'Product');
       can('manage', 'Sku');
       can('manage', 'PromoCode');
-      // CASL's 'manage' matches every action, including custom ones — so
-      // without this, 'manage' would silently also grant 'apply', which is
-      // meant to be client-only (verified empirically, see decisions.md).
+      // 'manage' matches every action, including custom ones like 'apply'
+      // — this carve-out is not redundant (decisions.md).
       cannot('apply', 'PromoCode');
     } else {
       can('read', 'Category');

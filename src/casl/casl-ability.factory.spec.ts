@@ -142,10 +142,6 @@ describe('CaslAbilityFactory', () => {
       expect(ability.can('manage', 'PromoCode')).toBe(true);
     });
 
-    // CASL's 'manage' matches every action by default, including custom
-    // ones — without an explicit cannot('apply', ...), this would silently
-    // pass despite 'apply' being meant as client-only (found via manual
-    // testing, not this test — see decisions.md).
     it('manager cannot apply PromoCode, despite manage', () => {
       const ability = factory.createForUser({
         id: 'user-1',

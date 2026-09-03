@@ -201,8 +201,7 @@ enum DiscountType {
 }
 
 // discount_value is a percentage (1-100) or minor units depending on
-// discount_type; validated in the service layer, not a schema CHECK — see
-// docs/decisions.md.
+// discount_type; range validated in the service layer, not a schema CHECK.
 model PromoCode {
   id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code              String       @unique

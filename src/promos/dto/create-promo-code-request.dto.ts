@@ -17,7 +17,6 @@ import {
 } from './discount-request.dto';
 import type { DiscountRequestDto } from './discount-request.dto';
 
-// code is normalized to uppercase on write, in the service.
 @ApiExtraModels(PercentageDiscountRequestDto, FixedAmountDiscountRequestDto)
 export class CreatePromoCodeRequestDto {
   @ApiProperty()

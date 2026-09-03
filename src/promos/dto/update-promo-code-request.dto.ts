@@ -21,7 +21,6 @@ import {
 } from './discount-request.dto';
 import type { DiscountRequestDto } from './discount-request.dto';
 
-// code is not here — it's immutable after creation (docs/decisions.md).
 @ApiExtraModels(PercentageDiscountRequestDto, FixedAmountDiscountRequestDto)
 export class UpdatePromoCodeRequestDto {
   @ApiPropertyOptional({

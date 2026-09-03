@@ -8,12 +8,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePromoCodeRequestDto } from './dto/create-promo-code-request.dto';
 import { DiscountRequestDto } from './dto/discount-request.dto';
 import { ListPromoCodesQueryDto } from './dto/list-promo-codes-query.dto';
-import { PromoCodeInvalidReason } from './dto/promo-code-validation-response.dto';
 import { PromoCodeListResponseDto } from './dto/promo-code-list-response.dto';
 import { PromoCodeResponseDto } from './dto/promo-code-response.dto';
 import { PromoCodeValidationResponseDto } from './dto/promo-code-validation-response.dto';
 import { UpdatePromoCodeRequestDto } from './dto/update-promo-code-request.dto';
 import { PromoCodeTakenException } from './exceptions/promo-code-taken.exception';
+import {
+  computePromoDiscount,
+  evaluatePromoCode,
+} from './promo-evaluation.util';
 
 @Injectable()
 export class PromosService {
@@ -107,7 +110,7 @@ export class PromosService {
     const promo = await this.prisma.promoCode.findUnique({
       where: { code: code.toUpperCase() },
     });
-    const reason = this.evaluate(promo, subtotal);
+    const reason = evaluatePromoCode(promo, subtotal);
 
     if (reason) {
       return {
@@ -119,9 +122,9 @@ export class PromosService {
       };
     }
 
-    // reason is null only when promo passed every check in evaluate(), so
-    // it's guaranteed non-null here.
-    const discountAmount = this.computeDiscount(promo!, subtotal);
+    // reason is null only when promo passed every check in
+    // evaluatePromoCode(), so it's guaranteed non-null here.
+    const discountAmount = computePromoDiscount(promo!, subtotal);
     return {
       valid: true,
       reason: null,
@@ -129,46 +132,6 @@ export class PromosService {
       subtotal: MoneyDto.of(subtotal),
       total: MoneyDto.of(subtotal - discountAmount),
     };
-  }
-
-  private evaluate(
-    promo: {
-      isActive: boolean;
-      expiresAt: Date;
-      timesRedeemed: number;
-      usageLimit: number;
-      minPurchaseAmount: number | null;
-    } | null,
-    subtotal: number,
-  ): PromoCodeInvalidReason | null {
-    if (!promo || !promo.isActive) {
-      return 'invalid';
-    }
-    if (promo.expiresAt <= new Date()) {
-      return 'expired';
-    }
-    if (promo.timesRedeemed >= promo.usageLimit) {
-      return 'exhausted';
-    }
-    if (
-      promo.minPurchaseAmount !== null &&
-      subtotal < promo.minPurchaseAmount
-    ) {
-      return 'minimum-not-met';
-    }
-    return null;
-  }
-
-  // Capped at subtotal so a large fixed-amount discount can never push
-  // total below zero.
-  private computeDiscount(
-    promo: { discountType: DiscountType; discountValue: number },
-    subtotal: number,
-  ): number {
-    if (promo.discountType === DiscountType.percentage) {
-      return Math.round((subtotal * promo.discountValue) / 100);
-    }
-    return Math.min(promo.discountValue, subtotal);
   }
 
   private discountToColumns(discount: DiscountRequestDto): {

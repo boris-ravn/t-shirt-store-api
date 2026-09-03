@@ -38,7 +38,7 @@ Every 4xx/5xx returns the same RFC 9457 `application/problem+json` shape (`Probl
 - **Authentication**: JWT access token (short-lived, role embedded, not re-read from the DB per request — see `decisions.md`) + opaque refresh token (sha256-hashed, rotated on use, revocable). `JwtAuthGuard`/`OptionalJwtAuthGuard` applied explicitly per route via `@UseGuards()` — no global guard.
 - **Roles**: `manager`, `client`, `delivery_person` (`UserRole` enum). Role never comes from a request body.
 - **Authorization**: CASL, one `CaslAbilityFactory` (`src/casl/`) building an `AppAbility` per request from the authenticated user's role. `@CheckPolicies(...)` + `PoliciesGuard`, applied **per-method, never at the controller class level** (see `decisions.md` — a real bug shipped from getting this wrong once).
-- Current `AppSubject` union covers `Category | Product | Sku | Cart | Like | PromoCode`. Extending it for `Order` is pending work (see below) — the `delivery_person` role's `orders` read ability needs to cover both `shipped` and `delivered`, per `database/README.md` §5's own flagged note. `Cart` and `Like` are client-only: neither `manager` nor `delivery_person` gets any ability on either, not even read (see `decisions.md`). `PromoCode` splits differently — manager gets `manage`, client gets a custom `apply` action (validate-only, not full CRUD); CASL's `manage` matches any action by default, so the manager grant needs an explicit `cannot('apply', ...)` carve-out (see `decisions.md` — a real gap found by testing, not obvious from the code).
+- Current `AppSubject` union covers `Category | Product | Sku | Cart | Like | PromoCode | Order`. `Cart` and `Like` are client-only: neither `manager` nor `delivery_person` gets any ability on either, not even read (see `decisions.md`). `PromoCode` splits differently — manager gets `manage`, client gets a custom `apply` action (validate-only, not full CRUD); CASL's `manage` matches any action by default, so the manager grant needs an explicit `cannot('apply', ...)` carve-out (see `decisions.md` — a real gap found by testing, not obvious from the code). `Order` has one custom action per transition endpoint (`cancel`/`process`/`ship`/`deliver`, plus `create`/`read`) rather than `manage`, deliberately avoiding that same wildcard trap; `delivery_person`'s `read` is service-scoped to `shipped` orders plus their own `delivered` ones, per `database/README.md` §5's flagged note.
 
 ## Data layer
 
@@ -51,7 +51,7 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 ## Testing strategy
 
 - **Unit** (`*.service.spec.ts`): mock `PrismaService`, assert on branch logic (which exception fires, which fields get written, role-based visibility). Standard NestJS testing-module pattern.
-- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Currently covers the auth flow (sign-up → sign-in → refresh → sign-out). Checkout and order-history e2e coverage is pending — write it as those flows land, not after.
+- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out); order history (role-scoped listing, filters, pagination, ownership 404), seeding orders directly via Prisma rather than through checkout since a real `paid` order needs Slice 5's payment webhook; and checkout (cart → pending order reservation, cancel-from-pending release, and a concurrent-double-checkout regression test — real Postgres is what makes that last one meaningful, a mocked-Prisma unit test can't exercise real transaction concurrency). The `pending → paid` leg (cart → order → payment → `paid`) lands with Slice 5.
 - Root `CLAUDE.md`'s rule: don't write assertions for code written in the same session: offer the mocking setup, let the reasoning happen in review.
 
 ## Module map
@@ -67,7 +67,7 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 | `cart` | Done | cart + cart items, SKU-scoped, live pricing (client-only) |
 | `likes` | Done | product likes (client-only) — feeds the notification recipient list |
 | `promos` | Done | promo code CRUD (manager) + validation against the caller's cart (client). Redemption itself (`times_redeemed` reserve/release) lands with `orders` |
-| `orders` | Pending | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock |
+| `orders` | Done | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock. `paid` itself is only reachable via direct DB write until Slice 5's payment webhook lands |
 | `payments` | Pending | Stripe Payment Intent (cart) + Payment Link (single-SKU), webhook handling, stock Fulfil/Direct-sale |
 | `notifications` | Pending | low-stock detection, BullMQ-backed email fan-out to likers who haven't bought |
 | Stale-pending sweep | Pending | periodic job cancelling abandoned `pending` orders (releases stock + promo reservations) |

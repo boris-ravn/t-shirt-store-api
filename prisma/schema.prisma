@@ -45,6 +45,8 @@ model User {
   cart                Cart?
   likes               Like[]
   createdPromoCodes   PromoCode[]
+  orders              Order[]
+  orderStatusChanges  OrderStatusHistory[]
 
   @@map("users")
 }
@@ -99,10 +101,11 @@ model Product {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  category Category       @relation(fields: [categoryId], references: [id])
-  images   ProductImage[]
-  skus     Sku[]
-  likes    Like[]
+  category   Category       @relation(fields: [categoryId], references: [id])
+  images     ProductImage[]
+  skus       Sku[]
+  likes      Like[]
+  orderItems OrderItem[]
 
   @@index([categoryId, createdAt])
   @@map("products")
@@ -137,8 +140,9 @@ model Sku {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  product   Product    @relation(fields: [productId], references: [id])
-  cartItems CartItem[]
+  product    Product     @relation(fields: [productId], references: [id])
+  cartItems  CartItem[]
+  orderItems OrderItem[]
 
   @@unique([productId, size, color])
   @@index([productId])
@@ -216,7 +220,100 @@ model PromoCode {
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  creator User @relation(fields: [createdBy], references: [id])
+  creator User    @relation(fields: [createdBy], references: [id])
+  orders  Order[]
 
   @@map("promo_codes")
+}
+
+// ---------------------------------------------------------------- orders
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+
+  @@map("order_status")
+}
+
+model Order {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String      @map("user_id") @db.Uuid
+  status         OrderStatus @default(pending)
+  subtotal       Int
+  promoCodeId    String?     @map("promo_code_id") @db.Uuid
+  discountAmount Int         @default(0) @map("discount_amount")
+  total          Int
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user            User                  @relation(fields: [userId], references: [id])
+  promoCode       PromoCode?            @relation(fields: [promoCodeId], references: [id])
+  items           OrderItem[]
+  shippingDetails OrderShippingDetails?
+  statusHistory   OrderStatusHistory[]
+
+  @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([promoCodeId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId     String   @map("order_id") @db.Uuid
+  skuId       String   @map("sku_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  quantity    Int
+  unitPrice   Int      @map("unit_price")
+  productName String   @map("product_name")
+  size        String
+  color       String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  sku     Sku     @relation(fields: [skuId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([skuId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderShippingDetails {
+  orderId       String   @id @map("order_id") @db.Uuid
+  recipientName String   @map("recipient_name")
+  phone         String?
+  line1         String
+  line2         String?
+  city          String
+  state         String?
+  postalCode    String   @map("postal_code")
+  country       String   @db.Char(2)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("order_shipping_details")
+}
+
+// clock_timestamp(), not now() — see docs/database/README.md §5.
+model OrderStatusHistory {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String      @map("order_id") @db.Uuid
+  status    OrderStatus
+  changedBy String?     @map("changed_by") @db.Uuid
+  createdAt DateTime    @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz
+
+  order         Order @relation(fields: [orderId], references: [id])
+  changedByUser User? @relation(fields: [changedBy], references: [id])
+
+  @@index([orderId, createdAt])
+  @@index([changedBy, status, createdAt])
+  @@map("order_status_history")
 }

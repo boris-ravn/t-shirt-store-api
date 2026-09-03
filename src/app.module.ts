@@ -8,6 +8,7 @@ import { CaslModule } from './casl/casl.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { validate } from './config/env.validation';
 import { LikesModule } from './likes/likes.module';
+import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PromosModule } from './promos/promos.module';
 import { UsersModule } from './users/users.module';
@@ -38,6 +39,7 @@ import { UsersModule } from './users/users.module';
     CartModule,
     LikesModule,
     PromosModule,
+    OrdersModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -12,8 +12,6 @@ import { InsufficientStockException } from './exceptions/insufficient-stock.exce
 import { InvalidStatusTransitionException } from './exceptions/invalid-status-transition.exception';
 import { OrdersService } from './orders.service';
 
-// Scaffold: fixtures/mocks are wired up, assertions are TODOs for the
-// dedicated testing pass (matches the cart/likes/promos slices' workflow).
 // $transaction mocking follows auth.service.spec.ts's pattern: the callback
 // runs against the same mock object as `prisma`, so tx.order.x ===
 // prisma.order.x for assertion purposes.
@@ -51,11 +49,14 @@ describe('OrdersService', () => {
   const managerUser = { id: 'manager-1', role: UserRole.manager };
   const deliveryUser = { id: 'delivery-1', role: UserRole.delivery_person };
 
+  // Shape matches CartItemResponseDto's nested SkuResponseDto (price as
+  // Money, not the raw Prisma column) — this is what cartService.getOrCreate
+  // actually returns, and createOrder reads item.sku.price.amount.
   const skuA = {
     id: 'sku-a',
     size: 'M',
     color: 'black',
-    price: 1999,
+    price: { amount: 1999, currency: 'USD' },
     availableQuantity: 10,
   };
   const cartWithOneItem = {
@@ -249,15 +250,50 @@ describe('OrdersService', () => {
 
       const result = await service.createOrder(clientUser, {});
 
-      // TODO(testing agent): assert the Reserve $executeRaw call's SQL
-      // touches skus with the right skuId/quantity; assert
-      // prisma.order.create's data includes items.create mapped from the
-      // cart (skuId, productId, quantity, unitPrice, productName, size,
-      // color) and statusHistory.create: { status: pending, changedBy:
-      // clientUser.id }; assert prisma.cartItem.deleteMany was called with
-      // { where: { cartId: cartWithOneItem.id } }; assert result is an
-      // OrderResponseDto (no user/promoCode fields).
-      void result;
+      expect(prisma.$executeRaw).toHaveBeenCalledWith(
+        expect.any(Array),
+        2,
+        skuA.id,
+        2,
+      );
+      expect(prisma.order.create).toHaveBeenCalledWith({
+        data: {
+          userId: clientUser.id,
+          subtotal: 3998,
+          promoCodeId: undefined,
+          discountAmount: 0,
+          total: 3998,
+          items: {
+            create: [
+              {
+                skuId: skuA.id,
+                productId: 'product-1',
+                quantity: 2,
+                unitPrice: skuA.price.amount,
+                productName: 'Classic Tee',
+                size: skuA.size,
+                color: skuA.color,
+              },
+            ],
+          },
+          statusHistory: {
+            create: { status: OrderStatus.pending, changedBy: clientUser.id },
+          },
+        },
+        include: {
+          items: true,
+          shippingDetails: true,
+          user: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+          promoCode: { select: { id: true, code: true } },
+        },
+      });
+      expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
+        where: { cartId: cartWithOneItem.id },
+      });
+      expect(result).not.toHaveProperty('user');
+      expect(result).not.toHaveProperty('promoCode');
     });
   });
 
@@ -277,11 +313,13 @@ describe('OrdersService', () => {
 
       const result = await service.listOrders(clientUser, baseQuery);
 
-      // TODO(testing agent): assert prisma.order.findMany's where includes
-      // { userId: clientUser.id } (via the AND-combined visibility clause),
-      // and result.data[0] has no `user`/`promoCode` fields (OrderResponseDto,
-      // not OrderAdminResponseDto).
-      void result;
+      expect(prisma.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{ userId: clientUser.id }, {}] },
+        }),
+      );
+      expect(result.data[0]).not.toHaveProperty('user');
+      expect(result.data[0]).not.toHaveProperty('promoCode');
     });
 
     it("does not scope a manager's list by userId and returns OrderAdminResponseDto", async () => {
@@ -290,9 +328,11 @@ describe('OrdersService', () => {
 
       const result = await service.listOrders(managerUser, baseQuery);
 
-      // TODO(testing agent): assert the where clause has no userId
-      // restriction, and result.data[0] includes `user`/`promoCode`.
-      void result;
+      expect(prisma.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { AND: [{}, {}] } }),
+      );
+      expect(result.data[0]).toHaveProperty('user', orderEntity.user);
+      expect(result.data[0]).toHaveProperty('promoCode', orderEntity.promoCode);
     });
 
     it("scopes a delivery person's list to shipped orders or their own deliveries", async () => {
@@ -301,10 +341,30 @@ describe('OrdersService', () => {
 
       const result = await service.listOrders(deliveryUser, baseQuery);
 
-      // TODO(testing agent): assert the where clause's visibility OR-branch
-      // matches { status: 'shipped' } or { status: 'delivered', statusHistory:
-      // { some: { changedBy: deliveryUser.id, status: 'delivered' } } }.
-      void result;
+      expect(prisma.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                OR: [
+                  { status: OrderStatus.shipped },
+                  {
+                    status: OrderStatus.delivered,
+                    statusHistory: {
+                      some: {
+                        changedBy: deliveryUser.id,
+                        status: OrderStatus.delivered,
+                      },
+                    },
+                  },
+                ],
+              },
+              {},
+            ],
+          },
+        }),
+      );
+      expect(result.data[0]).not.toHaveProperty('user');
     });
 
     it('deliveredBy=me narrows a delivery person to only their own delivered orders (no shipped)', async () => {
@@ -316,8 +376,24 @@ describe('OrdersService', () => {
         deliveredBy: 'me',
       });
 
-      // TODO(testing agent): assert the where clause is exactly the
-      // own-deliveries predicate, without the `status: shipped` OR-branch.
+      expect(prisma.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                status: OrderStatus.delivered,
+                statusHistory: {
+                  some: {
+                    changedBy: deliveryUser.id,
+                    status: OrderStatus.delivered,
+                  },
+                },
+              },
+              {},
+            ],
+          },
+        }),
+      );
     });
   });
 
@@ -336,10 +412,10 @@ describe('OrdersService', () => {
       const clientResult = await service.getOrder(clientUser, orderEntity.id);
       const managerResult = await service.getOrder(managerUser, orderEntity.id);
 
-      // TODO(testing agent): assert clientResult has no user/promoCode
-      // fields and managerResult does.
-      void clientResult;
-      void managerResult;
+      expect(clientResult).not.toHaveProperty('user');
+      expect(clientResult).not.toHaveProperty('promoCode');
+      expect(managerResult).toHaveProperty('user', orderEntity.user);
+      expect(managerResult).toHaveProperty('promoCode', orderEntity.promoCode);
     });
   });
 
@@ -355,11 +431,18 @@ describe('OrdersService', () => {
 
       const result = await service.cancelOrder(clientUser, orderEntity.id);
 
-      // TODO(testing agent): assert prisma.sku.update was called with
-      // { where: { id: skuA.id }, data: { reservedStock: { decrement: 2 } } }
-      // — Release, not Restock. Assert prisma.orderStatusHistory.create was
-      // called with { orderId, status: cancelled, changedBy: clientUser.id }.
-      void result;
+      expect(prisma.sku.update).toHaveBeenCalledWith({
+        where: { id: skuA.id },
+        data: { reservedStock: { decrement: 2 } },
+      });
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: orderEntity.id,
+          status: OrderStatus.cancelled,
+          changedBy: clientUser.id,
+        },
+      });
+      expect(result).not.toHaveProperty('user');
     });
 
     it('restocks (not releases) when cancelling a paid/processing order — the pending guard must have failed first', async () => {
@@ -375,9 +458,10 @@ describe('OrdersService', () => {
 
       await service.cancelOrder(clientUser, orderEntity.id);
 
-      // TODO(testing agent): assert prisma.sku.update was called with
-      // { where: { id: skuA.id }, data: { stock: { increment: 2 } } } —
-      // Restock, not Release.
+      expect(prisma.sku.update).toHaveBeenCalledWith({
+        where: { id: skuA.id },
+        data: { stock: { increment: 2 } },
+      });
     });
 
     it('releases the promo redemption slot when the cancelled order had one', async () => {
@@ -389,8 +473,10 @@ describe('OrdersService', () => {
 
       await service.cancelOrder(clientUser, orderEntity.id);
 
-      // TODO(testing agent): assert prisma.promoCode.update was called with
-      // { where: { id: activePromo.id }, data: { timesRedeemed: { decrement: 1 } } }.
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: activePromo.id },
+        data: { timesRedeemed: { decrement: 1 } },
+      });
     });
 
     it('throws InvalidStatusTransitionException when the order is shipped, delivered, or already cancelled', async () => {
@@ -423,8 +509,10 @@ describe('OrdersService', () => {
 
       await service.cancelOrder(managerUser, orderEntity.id);
 
-      // TODO(testing agent): assert prisma.order.updateMany's where has no
-      // userId restriction for the manager caller.
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: orderEntity.id, status: OrderStatus.pending },
+        data: { status: OrderStatus.cancelled },
+      });
     });
   });
 
@@ -438,11 +526,18 @@ describe('OrdersService', () => {
 
       const result = await service.processOrder(managerUser, orderEntity.id);
 
-      // TODO(testing agent): assert prisma.order.updateMany was called with
-      // { where: { id: orderEntity.id, status: 'paid' }, data: { status:
-      // 'processing' } }, and orderStatusHistory.create recorded changedBy:
-      // managerUser.id.
-      void result;
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: orderEntity.id, status: OrderStatus.paid },
+        data: { status: OrderStatus.processing },
+      });
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: orderEntity.id,
+          status: OrderStatus.processing,
+          changedBy: managerUser.id,
+        },
+      });
+      expect(result.status).toBe(OrderStatus.processing);
     });
 
     it('processOrder: throws InvalidStatusTransitionException from any other status', async () => {
@@ -466,8 +561,10 @@ describe('OrdersService', () => {
 
       await service.shipOrder(managerUser, orderEntity.id);
 
-      // TODO(testing agent): assert the guard was { status: 'processing' }
-      // -> { status: 'shipped' }.
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: orderEntity.id, status: OrderStatus.processing },
+        data: { status: OrderStatus.shipped },
+      });
     });
 
     it('deliverOrder: shipped -> delivered on success, changedBy is the delivery person', async () => {
@@ -479,9 +576,14 @@ describe('OrdersService', () => {
 
       const result = await service.deliverOrder(deliveryUser, orderEntity.id);
 
-      // TODO(testing agent): assert orderStatusHistory.create's changedBy is
-      // deliveryUser.id, and result is an OrderResponseDto (not admin).
-      void result;
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: orderEntity.id,
+          status: OrderStatus.delivered,
+          changedBy: deliveryUser.id,
+        },
+      });
+      expect(result).not.toHaveProperty('user');
     });
 
     it('throws NotFoundException, not a transition error, when the order does not exist at all', async () => {
@@ -527,10 +629,14 @@ describe('OrdersService', () => {
         },
       );
 
-      // TODO(testing agent): assert orderStatusHistory.findMany was called
-      // with orderBy: { createdAt: 'asc' } (oldest first, per the contract —
-      // opposite of listOrders' default).
-      void result;
+      expect(prisma.orderStatusHistory.findMany).toHaveBeenCalledWith({
+        where: { orderId: orderEntity.id },
+        orderBy: { createdAt: 'asc' },
+        skip: 0,
+        take: 20,
+      });
+      expect(result.meta).toEqual({ total: 1, limit: 20, offset: 0 });
+      expect(result.data[0].status).toBe(OrderStatus.pending);
     });
   });
 });

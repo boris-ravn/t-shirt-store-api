@@ -96,8 +96,16 @@ export class OrdersService {
     }
     const discountAmount = promo ? computePromoDiscount(promo, subtotal) : 0;
     const total = subtotal - discountAmount;
+    const cartItemIds = cart.items.map((item) => item.id);
 
     const order = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.cartItem.deleteMany({
+        where: { id: { in: cartItemIds }, cartId: cart.id },
+      });
+      if (claimed.count !== cartItemIds.length) {
+        throw new CartEmptyException();
+      }
+
       for (const item of cart.items) {
         const affected = await tx.$executeRaw`
           UPDATE skus SET reserved_stock = reserved_stock + ${item.quantity}, updated_at = now()
@@ -154,8 +162,6 @@ export class OrdersService {
         },
         include: ORDER_INCLUDE,
       });
-
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
       return created;
     });

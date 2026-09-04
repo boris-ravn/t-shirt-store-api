@@ -2,7 +2,7 @@
 
 REST API for a T-shirt store: catalog with size/colour variants, cart, orders with a tracked status lifecycle, Stripe payments through two flows, a stale-pending order sweep, and queue-backed low-stock notifications.
 
-Capstone project for the RAVN backend module. Built on an ERD designed in Week 1 and an OpenAPI contract designed in Week 2 — both live in [`docs/`](docs/) and are the contract the implementation answers to.
+Built on an ERD and an OpenAPI contract designed up front — both live in [`docs/`](docs/) and are the contract the implementation answers to.
 
 All slices are implemented and merged to `main`. See [`docs/architecture.md`](docs/architecture.md) for the current module map and stack, and [`docs/decisions.md`](docs/decisions.md) for why things are the way they are.
 

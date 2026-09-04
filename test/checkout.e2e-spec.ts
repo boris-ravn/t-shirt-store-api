@@ -8,9 +8,30 @@ import {
   StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import request from 'supertest';
+import Stripe from 'stripe';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
+import { PaymentMethod, PaymentStatus } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
+// Set only when a developer has added a real Stripe test-mode key to .env
+// (see test/env-setup.ts) — gates the tests that call the actual Stripe API.
+const hasRealStripeKey =
+  process.env.STRIPE_SECRET_KEY !== 'sk_test_e2e_placeholder';
+
+function signedWebhookRequest(app: INestApplication, payload: object) {
+  const body = JSON.stringify(payload);
+  const signature = Stripe.webhooks.generateTestHeaderString({
+    payload: body,
+    secret: WEBHOOK_SECRET,
+  });
+  return request(app.getHttpServer())
+    .post('/v1/webhooks/stripe')
+    .set('Content-Type', 'application/json')
+    .set('Stripe-Signature', signature)
+    .send(body);
+}
 
 jest.setTimeout(120_000);
 
@@ -68,7 +89,7 @@ describe('Checkout (e2e)', () => {
       .overrideProvider(PrismaService)
       .useValue(testPrismaService)
       .compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     configureApp(app);
     await app.init();
 
@@ -184,5 +205,167 @@ describe('Checkout (e2e)', () => {
       where: { items: { some: { skuId } } },
     });
     expect(ordersForSku).toBe(1);
+  });
+
+  // The webhook secret is real (from .env if the developer added one, a
+  // fixed placeholder otherwise — see test/env-setup.ts); either way it's
+  // the same secret this app is configured with, so
+  // stripe.webhooks.constructEvent's verification is exercised for real,
+  // satisfying the project's "never claim a webhook works without actually
+  // running verification" rule without needing a live Stripe API call or
+  // the Stripe CLI (decisions.md).
+  describe('Stripe webhook — payment_intent.succeeded (Fulfil)', () => {
+    it('rejects an incorrectly signed event with 400 and processes nothing', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/v1/webhooks/stripe')
+        .set('Content-Type', 'application/json')
+        .set('Stripe-Signature', 't=1,v1=not-a-real-signature')
+        .send(
+          JSON.stringify({ id: 'evt_bad', type: 'payment_intent.succeeded' }),
+        );
+
+      expect(response.status).toBe(400);
+      const stored = await prisma.stripeWebhookEvent.findUnique({
+        where: { id: 'evt_bad' },
+      });
+      expect(stored).toBeNull();
+    });
+
+    it('marks the order paid, converts the reservation into a real stock decrement, and writes shipping details', async () => {
+      const { token, skuId } = await createClientWithCart(2);
+      const created = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      const orderId = (created.body as OrderBody).id;
+      const order = await prisma.order.findUniqueOrThrow({
+        where: { id: orderId },
+      });
+
+      const stripePaymentIntentId = `pi_test_${orderId}`;
+      await prisma.payment.create({
+        data: {
+          orderId,
+          method: PaymentMethod.payment_intent,
+          stripePaymentIntentId,
+          amount: order.total,
+          currency: 'usd',
+          status: PaymentStatus.pending,
+        },
+      });
+
+      const event = {
+        id: `evt_${orderId}`,
+        object: 'event',
+        type: 'payment_intent.succeeded',
+        data: {
+          object: {
+            id: stripePaymentIntentId,
+            object: 'payment_intent',
+            metadata: { orderId },
+            shipping: {
+              name: 'Ada Lovelace',
+              phone: '+15551234567',
+              address: {
+                line1: '1 Infinite Loop',
+                line2: null,
+                city: 'Cupertino',
+                state: 'CA',
+                postal_code: '95014',
+                country: 'US',
+              },
+            },
+          },
+        },
+      };
+
+      const response = await signedWebhookRequest(app, event);
+      expect(response.status).toBe(204);
+
+      const paidOrder = await prisma.order.findUniqueOrThrow({
+        where: { id: orderId },
+      });
+      expect(paidOrder.status).toBe('paid');
+
+      const sku = await prisma.sku.findUniqueOrThrow({ where: { id: skuId } });
+      expect(sku.stock).toBe(8);
+      expect(sku.reservedStock).toBe(0);
+
+      const payment = await prisma.payment.findUniqueOrThrow({
+        where: { stripePaymentIntentId },
+      });
+      expect(payment.status).toBe('succeeded');
+
+      const shipping = await prisma.orderShippingDetails.findUniqueOrThrow({
+        where: { orderId },
+      });
+      expect(shipping.recipientName).toBe('Ada Lovelace');
+      expect(shipping.city).toBe('Cupertino');
+      expect(shipping.country).toBe('US');
+
+      const historyStatuses = await prisma.orderStatusHistory.findMany({
+        where: { orderId },
+        orderBy: { createdAt: 'asc' },
+      });
+      const paidRow = historyStatuses.find((row) => row.status === 'paid');
+      expect(paidRow?.changedBy).toBeNull();
+
+      const webhookEvent = await prisma.stripeWebhookEvent.findUniqueOrThrow({
+        where: { id: event.id },
+      });
+      expect(webhookEvent.processedAt).not.toBeNull();
+
+      // Stripe's at-least-once delivery: replaying the identical event must
+      // not double-decrement stock.
+      const replay = await signedWebhookRequest(app, event);
+      expect(replay.status).toBe(204);
+      const skuAfterReplay = await prisma.sku.findUniqueOrThrow({
+        where: { id: skuId },
+      });
+      expect(skuAfterReplay.stock).toBe(8);
+    });
+  });
+
+  (hasRealStripeKey ? describe : describe.skip)('Live Stripe API', () => {
+    it('createPaymentIntent returns a real Stripe client secret', async () => {
+      const { token } = await createClientWithCart(1);
+      const created = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      const orderId = (created.body as OrderBody).id;
+
+      const response = await request(app.getHttpServer())
+        .post(`/v1/orders/${orderId}/payment-intent`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(201);
+      const body = response.body as { clientSecret: string; paymentId: string };
+      expect(body.clientSecret).toMatch(/^pi_.+_secret_.+$/);
+
+      const payment = await prisma.payment.findUniqueOrThrow({
+        where: { id: body.paymentId },
+      });
+      expect(payment.stripePaymentIntentId).toMatch(/^pi_/);
+    });
+
+    it('createPaymentLinkCheckout returns a real Stripe-hosted checkout URL', async () => {
+      const { token, skuId } = await createClientWithCart(1);
+
+      const response = await request(app.getHttpServer())
+        .post('/v1/checkout/payment-link')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ skuId, quantity: 1 });
+
+      expect(response.status).toBe(201);
+      const body = response.body as { checkoutUrl: string; order: OrderBody };
+      expect(body.checkoutUrl).toContain('https://buy.stripe.com/');
+      expect(body.checkoutUrl).toContain(
+        `client_reference_id=${body.order.id}`,
+      );
+
+      const sku = await prisma.sku.findUniqueOrThrow({ where: { id: skuId } });
+      expect(sku.reservedStock).toBe(0); // Payment Links never reserve.
+    });
   });
 });

@@ -1,3 +1,12 @@
+import { config } from 'dotenv';
+
+// Loaded first so a real .env's STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET (if
+// the developer has added them) survive the `??=` defaults below — dotenv
+// does not override already-set process.env vars, and every other var here
+// is set unconditionally right after, so this can't leak a real DATABASE_URL
+// or JWT secret into the test run.
+config();
+
 // Runs before any e2e spec file is required — critically, before
 // `../src/app.module`'s `@Module()` decorator evaluates ConfigModule.forRoot(),
 // which calls env.validation.ts's validate() at import time, not at
@@ -25,3 +34,9 @@ process.env.AWS_ACCESS_KEY_ID = 'unused';
 process.env.AWS_SECRET_ACCESS_KEY = 'unused';
 process.env.THROTTLE_TTL = '60';
 process.env.THROTTLE_LIMIT = '1000';
+
+// Left as-is if already exported (a developer's real Stripe test-mode key,
+// for specs that call the live Stripe API) — defaulted only so every other
+// spec, which never touches Stripe, still passes env validation at boot.
+process.env.STRIPE_SECRET_KEY ??= 'sk_test_e2e_placeholder';
+process.env.STRIPE_WEBHOOK_SECRET ??= 'whsec_e2e_placeholder';

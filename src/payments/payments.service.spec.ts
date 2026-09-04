@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
   OrderStatus,
+  PaymentMethod,
   PaymentStatus,
   UserRole,
 } from '../generated/prisma/enums';
@@ -128,15 +129,26 @@ describe('PaymentsService', () => {
         pendingOrder.id,
       );
 
-      // TODO(testing agent): assert stripe.paymentIntents.create was called
-      // with { amount: pendingOrder.total, currency: 'usd',
-      // automatic_payment_methods: { enabled: true }, metadata: { orderId:
-      // pendingOrder.id } }; assert prisma.payment.create's data includes
-      // { orderId, method: 'payment_intent', stripePaymentIntentId: 'pi_123',
-      // amount: pendingOrder.total, currency: 'usd' }; assert result equals
-      // { paymentId: 'payment-1', clientSecret: 'pi_123_secret_abc', amount:
-      // { amount: 3998, currency: 'USD' } }.
-      void result;
+      expect(stripe.paymentIntents.create).toHaveBeenCalledWith({
+        amount: pendingOrder.total,
+        currency: 'usd',
+        automatic_payment_methods: { enabled: true },
+        metadata: { orderId: pendingOrder.id },
+      });
+      expect(prisma.payment.create).toHaveBeenCalledWith({
+        data: {
+          orderId: pendingOrder.id,
+          method: PaymentMethod.payment_intent,
+          stripePaymentIntentId: 'pi_123',
+          amount: pendingOrder.total,
+          currency: 'usd',
+        },
+      });
+      expect(result).toEqual({
+        paymentId: 'payment-1',
+        clientSecret: 'pi_123_secret_abc',
+        amount: { amount: 3998, currency: 'USD' },
+      });
     });
   });
 
@@ -197,15 +209,33 @@ describe('PaymentsService', () => {
 
       const result = await service.createPaymentLinkCheckout(clientUser, dto);
 
-      // TODO(testing agent): assert prisma.order.create's data has no stock
-      // side effects (this method never touches prisma.sku) and includes
-      // items.create with quantity 2, unitPrice skuEntity.price,
-      // productName/size/color from skuEntity, and statusHistory.create:
-      // { status: pending, changedBy: clientUser.id }; assert
-      // stripe.prices.create / stripe.paymentLinks.create were NOT called
-      // (an active link already exists); assert result.checkoutUrl equals
-      // `${retrieved url}?client_reference_id=order-2`.
-      void result;
+      expect(prisma.order.create).toHaveBeenCalledWith({
+        data: {
+          userId: clientUser.id,
+          subtotal: skuEntity.price * dto.quantity,
+          total: skuEntity.price * dto.quantity,
+          items: {
+            create: {
+              skuId: skuEntity.id,
+              productId: skuEntity.productId,
+              quantity: dto.quantity,
+              unitPrice: skuEntity.price,
+              productName: skuEntity.product.name,
+              size: skuEntity.size,
+              color: skuEntity.color,
+            },
+          },
+          statusHistory: {
+            create: { status: OrderStatus.pending, changedBy: clientUser.id },
+          },
+        },
+        include: { items: true, shippingDetails: true },
+      });
+      expect(stripe.prices.create).not.toHaveBeenCalled();
+      expect(stripe.paymentLinks.create).not.toHaveBeenCalled();
+      expect(result.checkoutUrl).toBe(
+        'https://buy.stripe.com/test_abc?client_reference_id=order-2',
+      );
     });
 
     it('reuses an existing, non-deactivated PaymentLink for the sku', async () => {
@@ -226,11 +256,13 @@ describe('PaymentsService', () => {
 
       await service.createPaymentLinkCheckout(clientUser, dto);
 
-      // TODO(testing agent): assert prisma.paymentLink.findFirst was called
-      // with { where: { skuId: skuEntity.id, deactivatedAt: null } }; assert
-      // stripe.paymentLinks.retrieve was called with 'plink_123'; assert
-      // stripe.prices.create / stripe.paymentLinks.create / prisma.
-      // paymentLink.create were NOT called.
+      expect(prisma.paymentLink.findFirst).toHaveBeenCalledWith({
+        where: { skuId: skuEntity.id, deactivatedAt: null },
+      });
+      expect(stripe.paymentLinks.retrieve).toHaveBeenCalledWith('plink_123');
+      expect(stripe.prices.create).not.toHaveBeenCalled();
+      expect(stripe.paymentLinks.create).not.toHaveBeenCalled();
+      expect(prisma.paymentLink.create).not.toHaveBeenCalled();
     });
 
     it('creates a new Stripe Price + Payment Link when none exists for the sku', async () => {
@@ -249,13 +281,28 @@ describe('PaymentsService', () => {
 
       await service.createPaymentLinkCheckout(clientUser, dto);
 
-      // TODO(testing agent): assert stripe.prices.create was called with
-      // { currency: 'usd', unit_amount: skuEntity.price, product_data: {
-      // name: expect.any(String) } }; assert stripe.paymentLinks.create's
-      // line_items has price: 'price_123', adjustable_quantity.enabled:
-      // true; assert prisma.paymentLink.create's data equals { skuId:
-      // skuEntity.id, stripePaymentLinkId: 'plink_new', stripePriceId:
-      // 'price_123', unitAmount: skuEntity.price }.
+      expect(stripe.prices.create).toHaveBeenCalledWith({
+        currency: 'usd',
+        unit_amount: skuEntity.price,
+        product_data: { name: expect.any(String) as string },
+      });
+      expect(stripe.paymentLinks.create).toHaveBeenCalledWith({
+        line_items: [
+          {
+            price: 'price_123',
+            quantity: 1,
+            adjustable_quantity: { enabled: true, minimum: 1 },
+          },
+        ],
+      });
+      expect(prisma.paymentLink.create).toHaveBeenCalledWith({
+        data: {
+          skuId: skuEntity.id,
+          stripePaymentLinkId: 'plink_new',
+          stripePriceId: 'price_123',
+          unitAmount: skuEntity.price,
+        },
+      });
     });
   });
 });

@@ -1,9 +1,5 @@
 # CLAUDE.md — t-shirt-store-api
 
-The repo-root `../CLAUDE.md` is the authority on how we work: planning before implementing, layering and testing decisions, conventions, hard rules, git. It applies here in full and is deliberately **not** repeated below. This file covers only what is specific to this codebase.
-
----
-
 ## What this is
 
 The capstone of the RAVN backend module: a REST API for a T-shirt store. Catalog with variants, cart, orders with a status lifecycle, Stripe payments in two flavours, and a queue-backed stock notification.

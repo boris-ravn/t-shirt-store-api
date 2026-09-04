@@ -338,6 +338,9 @@ enum PaymentStatus {
   @@map("payment_status")
 }
 
+// skuId kept plain here — a partial unique index (WHERE deactivated_at IS
+// NULL), hand-written into the migration, is what actually guards against
+// two concurrent first-time creations for the same sku (decisions.md).
 model PaymentLink {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   skuId               String    @map("sku_id") @db.Uuid
@@ -355,9 +358,12 @@ model PaymentLink {
 }
 
 // orderId kept plain here (a straight @@index, not @unique) — retries get
-// their own row each. The real idempotency backstop is a partial unique
-// index (WHERE status = 'succeeded'), hand-written into the migration since
-// Prisma's schema DSL can't express a partial constraint (README §9).
+// their own row each once one has resolved. Two partial unique indexes,
+// hand-written into the migration since Prisma's schema DSL can't express
+// them (README §9), guard the two states that must stay singular per order:
+// WHERE status = 'succeeded' (the payment-confirmation idempotency backstop)
+// and WHERE status = 'pending' (closes the concurrent-createPaymentIntent
+// race — decisions.md).
 // method <-> Stripe-column coherence is enforced by construction, not a
 // CHECK: PaymentsService/StripeWebhookService are the only writers, and each
 // code path only ever sets the columns for its own method (no user input

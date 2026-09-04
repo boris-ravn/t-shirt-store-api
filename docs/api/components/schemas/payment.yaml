@@ -1,3 +1,10 @@
+PaymentMethod:
+  type: string
+  enum:
+    - payment_link
+    - payment_intent
+  example: payment_intent
+
 PaymentIntentSession:
   type: object
   properties:
@@ -60,6 +67,8 @@ PaymentLinkCheckout:
       shippingDetails: null
       createdAt: "2026-01-12T10:45:00Z"
       updatedAt: "2026-01-12T10:45:00Z"
+      paymentMethod: null
+      promoCode: null
     checkoutUrl: https://buy.stripe.com/test_abc123
 
 CreatePaymentLinkCheckoutRequest:

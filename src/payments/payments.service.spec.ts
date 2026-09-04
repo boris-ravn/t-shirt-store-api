@@ -292,6 +292,8 @@ describe('PaymentsService', () => {
         shippingDetails: null,
         createdAt: new Date('2026-01-01T00:00:00Z'),
         updatedAt: new Date('2026-01-01T00:00:00Z'),
+        payments: [],
+        promoCode: null,
       });
       prisma.paymentLink.findFirst.mockResolvedValue({
         id: 'link-1',
@@ -324,7 +326,15 @@ describe('PaymentsService', () => {
             create: { status: OrderStatus.pending, changedBy: clientUser.id },
           },
         },
-        include: { items: true, shippingDetails: true },
+        include: {
+          items: true,
+          shippingDetails: true,
+          promoCode: { select: { id: true, code: true } },
+          payments: {
+            where: { status: 'succeeded' },
+            select: { method: true },
+          },
+        },
       });
       expect(stripe.prices.create).not.toHaveBeenCalled();
       expect(stripe.paymentLinks.create).not.toHaveBeenCalled();
@@ -347,6 +357,8 @@ describe('PaymentsService', () => {
         id: 'order-2',
         items: [],
         shippingDetails: null,
+        payments: [],
+        promoCode: null,
       });
 
       await service.createPaymentLinkCheckout(clientUser, dto);
@@ -372,6 +384,8 @@ describe('PaymentsService', () => {
         id: 'order-2',
         items: [],
         shippingDetails: null,
+        payments: [],
+        promoCode: null,
       });
 
       await service.createPaymentLinkCheckout(clientUser, dto);
@@ -419,6 +433,8 @@ describe('PaymentsService', () => {
         id: 'order-2',
         items: [],
         shippingDetails: null,
+        payments: [],
+        promoCode: null,
       });
 
       const result = await service.createPaymentLinkCheckout(clientUser, dto);

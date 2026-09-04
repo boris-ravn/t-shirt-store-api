@@ -116,6 +116,7 @@ describe('OrdersService', () => {
       lastName: 'B',
     },
     promoCode: null,
+    payments: [],
   };
 
   beforeEach(async () => {
@@ -300,6 +301,10 @@ describe('OrdersService', () => {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
           promoCode: { select: { id: true, code: true } },
+          payments: {
+            where: { status: 'succeeded' },
+            select: { method: true },
+          },
         },
       });
       expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({
@@ -309,7 +314,8 @@ describe('OrdersService', () => {
         },
       });
       expect(result).not.toHaveProperty('user');
-      expect(result).not.toHaveProperty('promoCode');
+      expect(result).toHaveProperty('promoCode', null);
+      expect(result).toHaveProperty('paymentMethod', null);
     });
 
     it('throws CartEmptyException, not InsufficientStockException, when a concurrent checkout already claimed the same cart items', async () => {
@@ -346,7 +352,8 @@ describe('OrdersService', () => {
         }),
       );
       expect(result.data[0]).not.toHaveProperty('user');
-      expect(result.data[0]).not.toHaveProperty('promoCode');
+      expect(result.data[0]).toHaveProperty('promoCode', null);
+      expect(result.data[0]).toHaveProperty('paymentMethod', null);
     });
 
     it("does not scope a manager's list by userId and returns OrderAdminResponseDto", async () => {
@@ -440,7 +447,7 @@ describe('OrdersService', () => {
       const managerResult = await service.getOrder(managerUser, orderEntity.id);
 
       expect(clientResult).not.toHaveProperty('user');
-      expect(clientResult).not.toHaveProperty('promoCode');
+      expect(clientResult).toHaveProperty('promoCode', orderEntity.promoCode);
       expect(managerResult).toHaveProperty('user', orderEntity.user);
       expect(managerResult).toHaveProperty('promoCode', orderEntity.promoCode);
     });

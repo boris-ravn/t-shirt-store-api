@@ -140,6 +140,10 @@
                         shippingDetails: null
                         createdAt: "2026-01-12T10:45:00Z"
                         updatedAt: "2026-01-12T11:00:00Z"
+                        paymentMethod: payment_intent
+                        promoCode:
+                          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                          code: WELCOME15
                     meta:
                       total: 1
                       limit: 20
@@ -182,14 +186,15 @@
                         shippingDetails: null
                         createdAt: "2026-01-12T10:45:00Z"
                         updatedAt: "2026-01-12T11:00:00Z"
+                        paymentMethod: payment_intent
+                        promoCode:
+                          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+                          code: WELCOME15
                         user:
                           id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
                           email: jane.doe@example.com
                           firstName: Jane
                           lastName: Doe
-                        promoCode:
-                          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
-                          code: WELCOME15
                     meta:
                       total: 1
                       limit: 20

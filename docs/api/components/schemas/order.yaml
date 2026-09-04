@@ -173,6 +173,31 @@ Order:
     updatedAt:
       type: string
       format: date-time
+    paymentMethod:
+      description: The method used to pay, once a payment has succeeded. Null until then.
+      oneOf:
+        - $ref: ./payment.yaml#/PaymentMethod
+        - type: 'null'
+    promoCode:
+      description: >
+        Joined through `promoCodeId`, correct only because `code` is
+        treated as immutable after creation.
+      oneOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            code:
+              type: string
+          required:
+            - id
+            - code
+          additionalProperties: false
+          example:
+            id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+            code: WELCOME15
+        - type: 'null'
   required:
     - id
     - status
@@ -183,6 +208,8 @@ Order:
     - shippingDetails
     - createdAt
     - updatedAt
+    - paymentMethod
+    - promoCode
   example:
     id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
     status: paid
@@ -218,6 +245,10 @@ Order:
       createdAt: "2026-01-12T11:00:00Z"
     createdAt: "2026-01-12T10:45:00Z"
     updatedAt: "2026-01-12T11:00:00Z"
+    paymentMethod: payment_intent
+    promoCode:
+      id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
+      code: WELCOME15
 
 OrderAdmin:
   allOf:
@@ -247,38 +278,14 @@ OrderAdmin:
             email: jane.doe@example.com
             firstName: Jane
             lastName: Doe
-        promoCode:
-          description: >
-            Joined through `promoCodeId`, correct only because `code` is
-            treated as immutable after creation.
-          oneOf:
-            - type: object
-              properties:
-                id:
-                  type: string
-                  format: uuid
-                code:
-                  type: string
-              required:
-                - id
-                - code
-              additionalProperties: false
-              example:
-                id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
-                code: WELCOME15
-            - type: 'null'
       required:
         - user
-        - promoCode
       example:
         user:
           id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
           email: jane.doe@example.com
           firstName: Jane
           lastName: Doe
-        promoCode:
-          id: 7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f
-          code: WELCOME15
   example:
     id: 6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c
     status: paid
@@ -314,6 +321,7 @@ OrderAdmin:
       createdAt: "2026-01-12T11:00:00Z"
     createdAt: "2026-01-12T10:45:00Z"
     updatedAt: "2026-01-12T11:00:00Z"
+    paymentMethod: payment_intent
     user:
       id: 2f4b6c8d-0a1e-4b3c-9d5e-6f7a8b9c0d1e
       email: jane.doe@example.com

@@ -407,6 +407,118 @@ describe('Checkout (e2e)', () => {
     });
   });
 
+  describe('Low-stock notification (smoke)', () => {
+    async function searchMailhog(recipient: string): Promise<string[]> {
+      const response = await fetch(
+        `http://localhost:8025/api/v2/search?kind=to&query=${encodeURIComponent(recipient)}`,
+      );
+      const body = (await response.json()) as {
+        items: Array<{ Content: { Headers: { Subject?: string[] } } }>;
+      };
+      return body.items.map((item) => item.Content.Headers.Subject?.[0] ?? '');
+    }
+
+    async function waitForMailhog(
+      recipient: string,
+      timeoutMs = 10_000,
+    ): Promise<string[]> {
+      const deadline = Date.now() + timeoutMs;
+      let subjects = await searchMailhog(recipient);
+      while (subjects.length === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        subjects = await searchMailhog(recipient);
+      }
+      return subjects;
+    }
+
+    it('emails a liker who has not bought once a sale drops stock to the threshold', async () => {
+      const likerPayload = signUpPayload();
+      const likerSignUp = await request(app.getHttpServer())
+        .post('/v1/auth/sign-up')
+        .send(likerPayload);
+      const likerToken = (likerSignUp.body as AuthSessionBody).accessToken;
+
+      const suffix = randomUUID();
+      const category = await prisma.category.create({
+        data: {
+          name: `Low Stock E2E ${suffix}`,
+          slug: `low-stock-e2e-${suffix}`,
+        },
+      });
+      const product = await prisma.product.create({
+        data: { categoryId: category.id, name: `Almost Gone Tee ${suffix}` },
+      });
+      const sku = await prisma.sku.create({
+        data: {
+          productId: product.id,
+          skuCode: `LOW-${suffix}`,
+          size: 'M',
+          color: 'black',
+          price: 1999,
+          stock: 4,
+        },
+      });
+
+      await request(app.getHttpServer())
+        .put(`/v1/products/${product.id}/like`)
+        .set('Authorization', `Bearer ${likerToken}`);
+
+      const buyerSignUp = await request(app.getHttpServer())
+        .post('/v1/auth/sign-up')
+        .send(signUpPayload());
+      const buyerToken = (buyerSignUp.body as AuthSessionBody).accessToken;
+      await request(app.getHttpServer())
+        .post('/v1/cart/items')
+        .set('Authorization', `Bearer ${buyerToken}`)
+        .send({ skuId: sku.id, quantity: 2 });
+      const created = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .set('Authorization', `Bearer ${buyerToken}`)
+        .send({});
+      const orderId = (created.body as OrderBody).id;
+      const order = await prisma.order.findUniqueOrThrow({
+        where: { id: orderId },
+      });
+
+      const stripePaymentIntentId = `pi_low_stock_${orderId}`;
+      await prisma.payment.create({
+        data: {
+          orderId,
+          method: PaymentMethod.payment_intent,
+          stripePaymentIntentId,
+          amount: order.total,
+          currency: 'usd',
+          status: PaymentStatus.pending,
+        },
+      });
+
+      const response = await signedWebhookRequest(app, {
+        id: `evt_low_stock_${orderId}`,
+        object: 'event',
+        type: 'payment_intent.succeeded',
+        data: {
+          object: {
+            id: stripePaymentIntentId,
+            object: 'payment_intent',
+            metadata: { orderId },
+            shipping: null,
+          },
+        },
+      });
+      expect(response.status).toBe(204);
+
+      const skuAfterSale = await prisma.sku.findUniqueOrThrow({
+        where: { id: sku.id },
+      });
+      expect(skuAfterSale.stock).toBe(2);
+
+      const subjects = await waitForMailhog(likerPayload.email);
+      expect(subjects).toContain(
+        `Almost Gone Tee ${suffix} is almost sold out`,
+      );
+    });
+  });
+
   (hasRealStripeKey ? describe : describe.skip)('Live Stripe API', () => {
     it('createPaymentIntent returns a real Stripe client secret', async () => {
       const { token } = await createClientWithCart(1);

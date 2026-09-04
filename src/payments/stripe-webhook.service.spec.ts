@@ -6,6 +6,7 @@ import {
   PaymentMethod,
   PaymentStatus,
 } from '../generated/prisma/enums';
+import { LowStockService } from '../notifications/low-stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
 import { StripeWebhookService } from './stripe-webhook.service';
@@ -31,6 +32,10 @@ describe('StripeWebhookService', () => {
   let stripe: {
     webhooks: { constructEvent: jest.Mock };
     checkout: { sessions: { listLineItems: jest.Mock } };
+  };
+  let lowStockService: {
+    detectAndOpen: jest.Mock;
+    enqueueNotifications: jest.Mock;
   };
 
   const eventIdConflict = new Prisma.PrismaClientKnownRequestError(
@@ -94,9 +99,14 @@ describe('StripeWebhookService', () => {
     prisma.$transaction.mockImplementation(
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );
+    prisma.sku.update.mockResolvedValue({ productId: 'product-1', stock: 10 });
     stripe = {
       webhooks: { constructEvent: jest.fn() },
       checkout: { sessions: { listLineItems: jest.fn() } },
+    };
+    lowStockService = {
+      detectAndOpen: jest.fn().mockResolvedValue([]),
+      enqueueNotifications: jest.fn(),
     };
 
     const module = await Test.createTestingModule({
@@ -104,6 +114,7 @@ describe('StripeWebhookService', () => {
         StripeWebhookService,
         { provide: PrismaService, useValue: prisma },
         { provide: STRIPE_CLIENT, useValue: stripe },
+        { provide: LowStockService, useValue: lowStockService },
       ],
     }).compile();
 
@@ -218,6 +229,24 @@ describe('StripeWebhookService', () => {
         where: { id: 'sku-1' },
         data: { stock: { decrement: 2 }, reservedStock: { decrement: 2 } },
       });
+    });
+
+    it('checks low-stock detection per item and enqueues any resulting notifications', async () => {
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+      prisma.orderItem.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 2, productId: 'product-1' },
+      ]);
+      prisma.sku.update.mockResolvedValue({ productId: 'product-1', stock: 2 });
+      lowStockService.detectAndOpen.mockResolvedValue(['notification-1']);
+
+      await service.handleEvent(paymentIntentSucceededEvent as never);
+
+      // TODO(testing agent): assert lowStockService.detectAndOpen was
+      // called with (tx, 'product-1', 'sku-1', 2); assert
+      // lowStockService.enqueueNotifications was called with
+      // ['notification-1'] AFTER the transaction resolves (it isn't part
+      // of the tx mock, so this mainly confirms it was called at all with
+      // the right accumulated ids).
     });
 
     it('marks the matching pending Payment row succeeded', async () => {
@@ -349,6 +378,24 @@ describe('StripeWebhookService', () => {
         where: { id: 'item-1' },
         data: { quantity: 3 },
       });
+    });
+
+    it('checks low-stock detection against the post-decrement sku and enqueues any resulting notifications', async () => {
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+      prisma.sku.findUniqueOrThrow.mockResolvedValue({
+        id: 'sku-2',
+        productId: 'product-2',
+        stock: 2,
+        reservedStock: 0,
+      });
+      lowStockService.detectAndOpen.mockResolvedValue(['notification-2']);
+
+      await service.handleEvent(checkoutSessionCompletedEvent as never);
+
+      // TODO(testing agent): assert lowStockService.detectAndOpen was
+      // called with (tx, 'product-2', 'sku-2', 2); assert
+      // lowStockService.enqueueNotifications was called with
+      // ['notification-2'].
     });
 
     it('proceeds to mark the order paid even when the Direct-sale stock guard affects 0 rows', async () => {

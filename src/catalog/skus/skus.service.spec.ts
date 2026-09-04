@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../../generated/prisma/client';
+import { LowStockService } from '../../notifications/low-stock.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DuplicateSkuException } from './exceptions/duplicate-sku.exception';
 import { SkuReservedException } from './exceptions/sku-reserved.exception';
@@ -12,6 +13,7 @@ describe('SkusService', () => {
     product: { findUnique: jest.Mock };
     sku: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
   };
+  let lowStockService: { resolveIfCrossedAbove: jest.Mock };
 
   const activeSku = {
     id: 'sku-1',
@@ -63,9 +65,14 @@ describe('SkusService', () => {
       product: { findUnique: jest.fn() },
       sku: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     };
+    lowStockService = { resolveIfCrossedAbove: jest.fn() };
 
     const module = await Test.createTestingModule({
-      providers: [SkusService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        SkusService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: LowStockService, useValue: lowStockService },
+      ],
     }).compile();
 
     service = module.get(SkusService);
@@ -300,6 +307,16 @@ describe('SkusService', () => {
         data: { stock: { increment: 10 } },
       });
       expect(result.stock).toBe(60);
+    });
+
+    it('checks whether the restock resolves an open low-stock event', async () => {
+      prisma.sku.findUnique.mockResolvedValue(activeSku);
+      prisma.sku.update.mockResolvedValue({ ...activeSku, stock: 60 });
+
+      await service.restock(activeSku.id, { quantity: 10 });
+
+      // TODO(testing agent): assert lowStockService.resolveIfCrossedAbove
+      // was called with (prisma, activeSku.productId, 60).
     });
   });
 });

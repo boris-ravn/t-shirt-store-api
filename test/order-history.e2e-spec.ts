@@ -1,30 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { execSync } from 'node:child_process';
 import { Server } from 'node:http';
-import { ConfigService } from '@nestjs/config';
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/bootstrap';
 import { OrderStatus } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { bootstrapE2eApp, teardownE2eApp } from './support/e2e-app';
+import { signUpPayload } from './support/fixtures';
 
 jest.setTimeout(120_000);
-
-function signUpPayload(overrides: Partial<Record<string, string>> = {}) {
-  return {
-    email: `order-history-e2e-${randomUUID()}@example.com`,
-    password: 'Sup3rSecret!',
-    firstName: 'Ada',
-    lastName: 'Lovelace',
-    ...overrides,
-  };
-}
 
 interface AuthSessionBody {
   accessToken: string;
@@ -60,49 +44,20 @@ describe('Order history (e2e)', () => {
   let productId: string;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('tshirt_store_test')
-      .withUsername('tshirt_store_test')
-      .withPassword('tshirt_store_test')
-      .start();
-
-    const databaseUrl = container.getConnectionUri();
-
-    execSync('npx prisma migrate deploy', {
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        DOTENV_CONFIG_QUIET: 'true',
-      },
-      stdio: 'inherit',
-    });
-
-    const testPrismaService = new PrismaService({
-      getOrThrow: () => databaseUrl,
-    } as unknown as ConfigService);
-
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(PrismaService)
-      .useValue(testPrismaService)
-      .compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
-
-    prisma = moduleRef.get(PrismaService);
+    ({ app, prisma, container } = await bootstrapE2eApp());
 
     // Fixture setup: two clients (A's orders are the ones under test, B's
     // order proves A can't see it), one category/product/sku created
     // directly since no manager-signup flow is needed for this suite's
     // purpose.
     const agent = request(app.getHttpServer());
-    const clientA = signUpPayload();
+    const clientA = signUpPayload('order-history-e2e');
     const signUpA = await agent.post('/v1/auth/sign-up').send(clientA);
     const bodyA = signUpA.body as AuthSessionBody;
     clientAToken = bodyA.accessToken;
     clientAId = bodyA.user.id;
 
-    const clientB = signUpPayload();
+    const clientB = signUpPayload('order-history-e2e');
     const signUpB = await agent.post('/v1/auth/sign-up').send(clientB);
     clientBId = (signUpB.body as AuthSessionBody).user.id;
 
@@ -189,8 +144,7 @@ describe('Order history (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await container.stop();
+    await teardownE2eApp({ app, prisma, container });
   });
 
   it("lists only the caller's own orders, newest first by default", async () => {

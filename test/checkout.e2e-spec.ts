@@ -1,13 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { execSync } from 'node:child_process';
 import { Server } from 'node:http';
-import { ConfigService } from '@nestjs/config';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
 import Stripe from 'stripe';
 import { AppModule } from '../src/app.module';
@@ -15,6 +10,8 @@ import { configureApp } from '../src/bootstrap';
 import { PaymentMethod, PaymentStatus } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { STRIPE_CLIENT } from '../src/stripe/stripe.constants';
+import { bootstrapE2eApp, teardownE2eApp } from './support/e2e-app';
+import { signUpPayload } from './support/fixtures';
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 // Gates the tests that call the actual Stripe API (see test/env-setup.ts).
@@ -36,15 +33,6 @@ function signedWebhookRequest(app: INestApplication<Server>, payload: object) {
 
 jest.setTimeout(120_000);
 
-function signUpPayload() {
-  return {
-    email: `checkout-e2e-${randomUUID()}@example.com`,
-    password: 'Sup3rSecret!',
-    firstName: 'Ada',
-    lastName: 'Lovelace',
-  };
-}
-
 interface AuthSessionBody {
   accessToken: string;
 }
@@ -60,46 +48,18 @@ describe('Checkout (e2e)', () => {
   let prisma: PrismaService;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('tshirt_store_test')
-      .withUsername('tshirt_store_test')
-      .withPassword('tshirt_store_test')
-      .start();
-
-    const databaseUrl = container.getConnectionUri();
-
-    execSync('npx prisma migrate deploy', {
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        DOTENV_CONFIG_QUIET: 'true',
-      },
-      stdio: 'inherit',
-    });
-
-    const testPrismaService = new PrismaService({
-      getOrThrow: () => databaseUrl,
-    } as unknown as ConfigService);
-
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(PrismaService)
-      .useValue(testPrismaService)
-      .compile();
-    app = moduleRef.createNestApplication({ rawBody: true });
-    configureApp(app);
-    await app.init();
-
-    prisma = moduleRef.get(PrismaService);
+    ({ app, prisma, container } = await bootstrapE2eApp({ rawBody: true }));
   });
 
   afterAll(async () => {
-    await app.close();
-    await container.stop();
+    await teardownE2eApp({ app, prisma, container });
   });
 
   async function createClientWithCart(quantity: number) {
     const agent = request(app.getHttpServer());
-    const signUp = await agent.post('/v1/auth/sign-up').send(signUpPayload());
+    const signUp = await agent
+      .post('/v1/auth/sign-up')
+      .send(signUpPayload('checkout-e2e'));
     const token = (signUp.body as AuthSessionBody).accessToken;
 
     const suffix = randomUUID();
@@ -433,7 +393,7 @@ describe('Checkout (e2e)', () => {
     }
 
     it('emails a liker who has not bought once a sale drops stock to the threshold', async () => {
-      const likerPayload = signUpPayload();
+      const likerPayload = signUpPayload('checkout-e2e');
       const likerSignUp = await request(app.getHttpServer())
         .post('/v1/auth/sign-up')
         .send(likerPayload);
@@ -466,7 +426,7 @@ describe('Checkout (e2e)', () => {
 
       const buyerSignUp = await request(app.getHttpServer())
         .post('/v1/auth/sign-up')
-        .send(signUpPayload());
+        .send(signUpPayload('checkout-e2e'));
       const buyerToken = (buyerSignUp.body as AuthSessionBody).accessToken;
       await request(app.getHttpServer())
         .post('/v1/cart/items')

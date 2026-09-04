@@ -24,6 +24,7 @@ A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with varian
 | Mail | `nodemailer` → local Mailhog in dev |
 | Testing | Jest (unit), Supertest + Testcontainers (e2e, real Postgres) |
 | Payments | Stripe SDK (`stripe`, pinned `22.6.1`), test mode only |
+| Scheduling | `@nestjs/schedule` (pinned `6.1.3` — the next major is ESM-only and breaks `ts-jest`, same class of issue as `@nestjs/config`, see `decisions.md`), in-process `@Cron()` jobs |
 | Not yet added | BullMQ + Redis — lands with notifications |
 
 ## Layering
@@ -71,13 +72,13 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 | `orders` | Done | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock |
 | `payments` | Done | Stripe Payment Intent (cart) + Payment Link (single-SKU) creation, `/v1/webhooks/stripe`, stock Fulfil/Direct-sale, `order_shipping_details` |
 | `notifications` | Pending | low-stock detection, BullMQ-backed email fan-out to likers who haven't bought |
-| Stale-pending sweep | Pending | periodic job cancelling abandoned `pending` orders (releases stock + promo reservations) |
+| Stale-pending sweep | Done | `StaleOrderSweepService` (`src/orders/`), a `@Cron()` job cancelling `pending` orders older than `STALE_ORDER_MAX_AGE_MINUTES` through the same Release path `cancelOrder` uses |
 
 Stock mechanics (five guarded transitions: Reserve, Fulfil, Release, Restock, Direct sale) are specified in `database/README.md` §8 — read that section before writing any stock `UPDATE`; which transition applies on cancellation depends on the order's *previous* status read under lock.
 
 ## Config surface
 
-Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`) — a missing var fails startup, not the first request that needs it. Current variables: see `.env.example` (DB connection, JWT secrets/expiry, SMTP, AWS/S3, throttle limits, Stripe secret + webhook signing key). Redis vars will be added when notifications land.
+Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`) — a missing var fails startup, not the first request that needs it. Current variables: see `.env.example` (DB connection, JWT secrets/expiry, SMTP, AWS/S3, throttle limits, Stripe secret + webhook signing key, stale-order sweep max age). Redis vars will be added when notifications land.
 
 ## Local infrastructure
 

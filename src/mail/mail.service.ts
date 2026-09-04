@@ -2,6 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -47,12 +56,14 @@ export class MailService {
     productName: string,
     imageUrl: string | undefined,
   ): Promise<void> {
+    const safeFirstName = escapeHtml(firstName);
+    const safeProductName = escapeHtml(productName);
     await this.transporter.sendMail({
       from: this.from,
       to,
       subject: `${productName} is almost sold out`,
       text: `Hi ${firstName},\n\n${productName} is almost sold out — grab it before it's gone.`,
-      html: `<p>Hi ${firstName},</p><p>${productName} is almost sold out — grab it before it's gone.</p>${imageUrl ? `<img src="${imageUrl}" alt="${productName}">` : ''}`,
+      html: `<p>Hi ${safeFirstName},</p><p>${safeProductName} is almost sold out — grab it before it's gone.</p>${imageUrl ? `<img src="${imageUrl}" alt="${safeProductName}">` : ''}`,
     });
     this.logger.log(`Low-stock notification sent to ${to}`);
   }

@@ -7,6 +7,7 @@ import {
   PaymentMethod,
   PaymentStatus,
 } from '../generated/prisma/enums';
+import { LowStockService } from '../notifications/low-stock.service';
 import { isUniqueConstraintViolation } from '../prisma/prisma-error.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
@@ -24,6 +25,7 @@ export class StripeWebhookService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
+    private readonly lowStockService: LowStockService,
   ) {}
 
   constructEvent(
@@ -93,6 +95,7 @@ export class StripeWebhookService {
       );
     }
 
+    const lowStockNotificationIds: string[] = [];
     await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.pending },
@@ -105,18 +108,26 @@ export class StripeWebhookService {
 
       const items = await tx.orderItem.findMany({
         where: { orderId },
-        select: { skuId: true, quantity: true },
+        select: { skuId: true, quantity: true, productId: true },
       });
       for (const item of items) {
         // No availability guard — Fulfil trusts Reserve's earlier check
         // (decisions.md).
-        await tx.sku.update({
+        const updated = await tx.sku.update({
           where: { id: item.skuId },
           data: {
             stock: { decrement: item.quantity },
             reservedStock: { decrement: item.quantity },
           },
         });
+        lowStockNotificationIds.push(
+          ...(await this.lowStockService.detectAndOpen(
+            tx,
+            item.productId,
+            item.skuId,
+            updated.stock,
+          )),
+        );
       }
 
       await tx.payment.updateMany({
@@ -139,6 +150,7 @@ export class StripeWebhookService {
         data: { orderId, status: OrderStatus.paid, changedBy: null },
       });
     });
+    await this.lowStockService.enqueueNotifications(lowStockNotificationIds);
   }
 
   private async directSale(session: Stripe.Checkout.Session): Promise<void> {
@@ -157,6 +169,7 @@ export class StripeWebhookService {
     const quantity = lineItems.data[0]?.quantity ?? 1;
     const amountTotal = session.amount_total ?? 0;
 
+    const lowStockNotificationIds: string[] = [];
     await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.order.updateMany({
         where: { id: orderId, status: OrderStatus.pending },
@@ -182,6 +195,14 @@ export class StripeWebhookService {
       `;
 
       const sku = await tx.sku.findUniqueOrThrow({ where: { id: item.skuId } });
+      lowStockNotificationIds.push(
+        ...(await this.lowStockService.detectAndOpen(
+          tx,
+          sku.productId,
+          sku.id,
+          sku.stock,
+        )),
+      );
       if (sku.stock - sku.reservedStock <= 0) {
         await tx.paymentLink.updateMany({
           where: { skuId: item.skuId, deactivatedAt: null },
@@ -221,6 +242,7 @@ export class StripeWebhookService {
         data: { orderId, status: OrderStatus.paid, changedBy: null },
       });
     });
+    await this.lowStockService.enqueueNotifications(lowStockNotificationIds);
   }
 
   private async writeShippingDetails(

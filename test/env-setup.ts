@@ -38,3 +38,5 @@ process.env.THROTTLE_LIMIT = '1000';
 process.env.STRIPE_SECRET_KEY ??= 'sk_test_e2e_placeholder';
 process.env.STRIPE_WEBHOOK_SECRET ??= 'whsec_e2e_placeholder';
 process.env.STALE_ORDER_MAX_AGE_MINUTES = '30';
+process.env.REDIS_HOST ??= 'localhost';
+process.env.REDIS_PORT ??= '6379';

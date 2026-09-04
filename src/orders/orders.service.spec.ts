@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { CartService } from '../cart/cart.service';
 import { CartEmptyException } from '../cart/exceptions/cart-empty.exception';
 import { OrderStatus, UserRole } from '../generated/prisma/enums';
+import { LowStockService } from '../notifications/low-stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeExhaustedException } from '../promos/exceptions/promo-code-exhausted.exception';
 import { PromoCodeExpiredException } from '../promos/exceptions/promo-code-expired.exception';
@@ -44,6 +45,10 @@ describe('OrdersService', () => {
     $transaction: jest.Mock;
   };
   let cartService: { getOrCreate: jest.Mock };
+  let lowStockService: {
+    detectAndOpen: jest.Mock;
+    resolveIfCrossedAbove: jest.Mock;
+  };
 
   const clientUser = { id: 'client-1', role: UserRole.client };
   const managerUser = { id: 'manager-1', role: UserRole.manager };
@@ -141,13 +146,19 @@ describe('OrdersService', () => {
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );
     prisma.cartItem.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.sku.update.mockResolvedValue({ productId: 'product-1', stock: 10 });
     cartService = { getOrCreate: jest.fn() };
+    lowStockService = {
+      detectAndOpen: jest.fn().mockResolvedValue([]),
+      resolveIfCrossedAbove: jest.fn(),
+    };
 
     const module = await Test.createTestingModule({
       providers: [
         OrdersService,
         { provide: PrismaService, useValue: prisma },
         { provide: CartService, useValue: cartService },
+        { provide: LowStockService, useValue: lowStockService },
       ],
     }).compile();
 
@@ -477,6 +488,27 @@ describe('OrdersService', () => {
         where: { id: skuA.id },
         data: { stock: { increment: 2 } },
       });
+    });
+
+    it('checks a Restock for a resolved low-stock event, but never a Release', async () => {
+      prisma.order.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+      prisma.orderItem.findMany.mockResolvedValue([
+        { skuId: skuA.id, quantity: 2 },
+      ]);
+      prisma.order.findUniqueOrThrow
+        .mockResolvedValueOnce({ ...orderEntity, promoCodeId: null })
+        .mockResolvedValueOnce(orderEntity);
+
+      await service.cancelOrder(clientUser, orderEntity.id);
+
+      expect(lowStockService.resolveIfCrossedAbove).toHaveBeenCalledTimes(1);
+      expect(lowStockService.resolveIfCrossedAbove).toHaveBeenCalledWith(
+        prisma,
+        'product-1',
+        10,
+      );
     });
 
     it('releases the promo redemption slot when the cancelled order had one', async () => {

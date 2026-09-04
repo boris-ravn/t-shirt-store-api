@@ -25,7 +25,7 @@ A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with varian
 | Testing | Jest (unit), Supertest + Testcontainers (e2e, real Postgres) |
 | Payments | Stripe SDK (`stripe`, pinned `22.6.1`), test mode only |
 | Scheduling | `@nestjs/schedule` (pinned `6.1.3` — the next major is ESM-only and breaks `ts-jest`, same class of issue as `@nestjs/config`, see `decisions.md`), in-process `@Cron()` jobs |
-| Not yet added | BullMQ + Redis — lands with notifications |
+| Queue | BullMQ (pinned `6.3.4`) + `@nestjs/bullmq` (pinned `11.0.5`, same ESM-major trap as `@nestjs/schedule`) + `ioredis` (pinned `6.0.0`, an explicit dependency since BullMQ 6 made it an optional peer); Redis via `docker-compose.yml` locally |
 
 ## Layering
 
@@ -53,7 +53,7 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 ## Testing strategy
 
 - **Unit** (`*.service.spec.ts`): mock `PrismaService`, assert on branch logic (which exception fires, which fields get written, role-based visibility). Standard NestJS testing-module pattern.
-- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out); order history (role-scoped listing, filters, pagination, ownership 404), seeding orders directly via Prisma rather than through checkout since exercising every status doesn't need a real payment; and checkout (cart → pending order reservation, cancel-from-pending release, a concurrent-double-checkout regression test, and the `payment_intent.succeeded` webhook's Fulfil path — signature-verified for real via `Stripe.webhooks.generateTestHeaderString`/`constructEvent` against the app's own configured secret, not the Stripe CLI, so it needs no live network call or real Stripe key to run). The two live-Stripe-API tests (real `createPaymentIntent`/`createPaymentLinkCheckout` calls) run only when a real `STRIPE_SECRET_KEY` is present in `.env`; they skip cleanly otherwise (`decisions.md`).
+- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out); order history (role-scoped listing, filters, pagination, ownership 404), seeding orders directly via Prisma rather than through checkout since exercising every status doesn't need a real payment; and checkout (cart → pending order reservation, cancel-from-pending release, a concurrent-double-checkout regression test, the `payment_intent.succeeded` webhook's Fulfil path — signature-verified for real via `Stripe.webhooks.generateTestHeaderString`/`constructEvent` against the app's own configured secret, not the Stripe CLI, so it needs no live network call or real Stripe key to run — and a low-stock notification smoke test that drives a real sale below threshold through the real BullMQ/Redis queue and polls the local Mailhog's HTTP API for the delivered email). The two live-Stripe-API tests (real `createPaymentIntent`/`createPaymentLinkCheckout` calls) run only when a real `STRIPE_SECRET_KEY` is present in `.env`; they skip cleanly otherwise (`decisions.md`).
 - Root `CLAUDE.md`'s rule: don't write assertions for code written in the same session: offer the mocking setup, let the reasoning happen in review.
 
 ## Module map
@@ -71,15 +71,15 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 | `promos` | Done | promo code CRUD (manager) + validation against the caller's cart (client). Redemption itself (`times_redeemed` reserve/release) lands with `orders` |
 | `orders` | Done | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock |
 | `payments` | Done | Stripe Payment Intent (cart) + Payment Link (single-SKU) creation, `/v1/webhooks/stripe`, stock Fulfil/Direct-sale, `order_shipping_details` |
-| `notifications` | Pending | low-stock detection, BullMQ-backed email fan-out to likers who haven't bought |
+| `notifications` | Done | low-stock detection (`LowStockService`), BullMQ-backed email fan-out to likers who haven't bought (`StockNotificationsProcessor`) |
 | Stale-pending sweep | Done | `StaleOrderSweepService` (`src/orders/`), a `@Cron()` job cancelling `pending` orders older than `STALE_ORDER_MAX_AGE_MINUTES` through the same Release path `cancelOrder` uses |
 
 Stock mechanics (five guarded transitions: Reserve, Fulfil, Release, Restock, Direct sale) are specified in `database/README.md` §8 — read that section before writing any stock `UPDATE`; which transition applies on cancellation depends on the order's *previous* status read under lock.
 
 ## Config surface
 
-Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`) — a missing var fails startup, not the first request that needs it. Current variables: see `.env.example` (DB connection, JWT secrets/expiry, SMTP, AWS/S3, throttle limits, Stripe secret + webhook signing key, stale-order sweep max age). Redis vars will be added when notifications land.
+Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`) — a missing var fails startup, not the first request that needs it. Current variables: see `.env.example` (DB connection, JWT secrets/expiry, SMTP, AWS/S3, throttle limits, Stripe secret + webhook signing key, stale-order sweep max age, Redis host/port).
 
 ## Local infrastructure
 
-`docker-compose.yml`: Postgres, Mailhog (SMTP catcher, UI at `:8025`), MinIO (S3-compatible, console at `:9001`). Redis (for BullMQ) is not yet added — lands with notifications.
+`docker-compose.yml`: Postgres, Mailhog (SMTP catcher, UI at `:8025`), Redis (for BullMQ), MinIO (S3-compatible, console at `:9001`).

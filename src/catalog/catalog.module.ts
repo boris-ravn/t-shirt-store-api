@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { StorageModule } from '../storage/storage.module';
 import { CategoriesController } from './categories/categories.controller';
 import { CategoriesService } from './categories/categories.service';
@@ -9,7 +10,7 @@ import { SkusController } from './skus/skus.controller';
 import { SkusService } from './skus/skus.service';
 
 @Module({
-  imports: [StorageModule],
+  imports: [StorageModule, NotificationsModule],
   controllers: [CategoriesController, ProductsController, SkusController],
   providers: [
     CategoriesService,

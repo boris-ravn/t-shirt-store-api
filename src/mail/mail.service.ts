@@ -19,10 +19,16 @@ export class MailService {
 
   constructor(configService: ConfigService) {
     this.from = configService.getOrThrow<string>('SMTP_FROM');
+    const user = configService.get<string>('SMTP_USER');
+    const pass = configService.get<string>('SMTP_PASSWORD');
     this.transporter = createTransport({
       host: configService.getOrThrow<string>('SMTP_HOST'),
       port: configService.getOrThrow<number>('SMTP_PORT'),
+      // false + STARTTLS is what both Mailhog (plaintext, no auth) and
+      // Brevo's relay on port 587 expect — nodemailer upgrades to TLS via
+      // STARTTLS on its own when the server offers it.
       secure: false,
+      ...(user && pass ? { auth: { user, pass } } : {}),
     });
   }
 

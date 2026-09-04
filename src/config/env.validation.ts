@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Max,
   Min,
@@ -56,6 +57,16 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   SMTP_FROM!: string;
+
+  // Unset for Mailhog (no auth locally); both required together for a real
+  // relay like Brevo, which rejects an unauthenticated connection.
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
 
   @IsString()
   @IsNotEmpty()

@@ -503,11 +503,12 @@ describe('OrdersService', () => {
 
       await service.cancelOrder(clientUser, orderEntity.id);
 
-      // TODO(testing agent): assert lowStockService.resolveIfCrossedAbove
-      // was called exactly once, with (tx, <sku.update's returned
-      // productId>, <sku.update's returned stock>) — Restock increases
-      // stock, so it's the only cancellation branch that can resolve an
-      // event; a plain Release (reservedStock decrement) never calls it.
+      expect(lowStockService.resolveIfCrossedAbove).toHaveBeenCalledTimes(1);
+      expect(lowStockService.resolveIfCrossedAbove).toHaveBeenCalledWith(
+        prisma,
+        'product-1',
+        10,
+      );
     });
 
     it('releases the promo redemption slot when the cancelled order had one', async () => {

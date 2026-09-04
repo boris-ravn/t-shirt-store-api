@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { Job } from 'bullmq';
+import { NotificationStatus } from '../generated/prisma/enums';
 import { ImageUrlService } from '../storage/image-url.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -53,11 +54,19 @@ describe('StockNotificationsProcessor', () => {
       data: { notificationId: 'notification-1' },
     } as Job<{ notificationId: string }>);
 
-    // TODO(testing agent): assert mailService.sendLowStockNotification was
-    // called with ('liker@example.com', 'Ada', 'Classic Tee',
-    // 'http://localhost:9000/bucket/products/product-1/front.jpg'); assert
-    // prisma.stockNotification.update was called with { where: { id:
-    // 'notification-1' }, data: { status: 'sent', sentAt: expect.any(Date) } }.
+    expect(mailService.sendLowStockNotification).toHaveBeenCalledWith(
+      'liker@example.com',
+      'Ada',
+      'Classic Tee',
+      'http://localhost:9000/bucket/products/product-1/front.jpg',
+    );
+    expect(prisma.stockNotification.update).toHaveBeenCalledWith({
+      where: { id: 'notification-1' },
+      data: {
+        status: NotificationStatus.sent,
+        sentAt: expect.any(Date) as Date,
+      },
+    });
   });
 
   it('sends no image url when the product has none', async () => {
@@ -70,9 +79,13 @@ describe('StockNotificationsProcessor', () => {
       data: { notificationId: 'notification-1' },
     } as Job<{ notificationId: string }>);
 
-    // TODO(testing agent): assert imageUrlService.buildUrl was NOT called;
-    // assert mailService.sendLowStockNotification's last argument is
-    // undefined.
+    expect(imageUrlService.buildUrl).not.toHaveBeenCalled();
+    expect(mailService.sendLowStockNotification).toHaveBeenCalledWith(
+      'liker@example.com',
+      'Ada',
+      'Classic Tee',
+      undefined,
+    );
   });
 
   it('marks the notification failed and rethrows when MailService fails', async () => {
@@ -87,8 +100,12 @@ describe('StockNotificationsProcessor', () => {
       } as Job<{ notificationId: string }>),
     ).rejects.toThrow('SMTP timeout');
 
-    // TODO(testing agent): assert prisma.stockNotification.update was called
-    // with { where: { id: 'notification-1' }, data: { status: 'failed',
-    // errorMessage: 'SMTP timeout' } }.
+    expect(prisma.stockNotification.update).toHaveBeenCalledWith({
+      where: { id: 'notification-1' },
+      data: {
+        status: NotificationStatus.failed,
+        errorMessage: 'SMTP timeout',
+      },
+    });
   });
 });

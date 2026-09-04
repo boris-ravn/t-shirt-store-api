@@ -315,8 +315,11 @@ describe('SkusService', () => {
 
       await service.restock(activeSku.id, { quantity: 10 });
 
-      // TODO(testing agent): assert lowStockService.resolveIfCrossedAbove
-      // was called with (prisma, activeSku.productId, 60).
+      expect(lowStockService.resolveIfCrossedAbove).toHaveBeenCalledWith(
+        prisma,
+        activeSku.productId,
+        60,
+      );
     });
   });
 });

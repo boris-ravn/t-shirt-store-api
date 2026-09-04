@@ -241,12 +241,15 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): assert lowStockService.detectAndOpen was
-      // called with (tx, 'product-1', 'sku-1', 2); assert
-      // lowStockService.enqueueNotifications was called with
-      // ['notification-1'] AFTER the transaction resolves (it isn't part
-      // of the tx mock, so this mainly confirms it was called at all with
-      // the right accumulated ids).
+      expect(lowStockService.detectAndOpen).toHaveBeenCalledWith(
+        prisma,
+        'product-1',
+        'sku-1',
+        2,
+      );
+      expect(lowStockService.enqueueNotifications).toHaveBeenCalledWith([
+        'notification-1',
+      ]);
     });
 
     it('marks the matching pending Payment row succeeded', async () => {
@@ -392,10 +395,15 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert lowStockService.detectAndOpen was
-      // called with (tx, 'product-2', 'sku-2', 2); assert
-      // lowStockService.enqueueNotifications was called with
-      // ['notification-2'].
+      expect(lowStockService.detectAndOpen).toHaveBeenCalledWith(
+        prisma,
+        'product-2',
+        'sku-2',
+        2,
+      );
+      expect(lowStockService.enqueueNotifications).toHaveBeenCalledWith([
+        'notification-2',
+      ]);
     });
 
     it('proceeds to mark the order paid even when the Direct-sale stock guard affects 0 rows', async () => {

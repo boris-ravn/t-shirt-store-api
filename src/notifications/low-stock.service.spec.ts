@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Prisma } from '../generated/prisma/client';
+import { OrderStatus } from '../generated/prisma/enums';
 import { LowStockService } from './low-stock.service';
 import { STOCK_NOTIFICATIONS_QUEUE } from './notifications.constants';
 
@@ -55,9 +56,8 @@ describe('LowStockService', () => {
         4,
       );
 
-      // TODO(testing agent): assert tx.lowStockEvent.create was NOT called;
-      // assert result is [].
-      void result;
+      expect(tx.lowStockEvent.create).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
     });
 
     it('opens an event and notifies likers who have not bought the product', async () => {
@@ -77,13 +77,28 @@ describe('LowStockService', () => {
         2,
       );
 
-      // TODO(testing agent): assert tx.lowStockEvent.create was called with
-      // { data: { productId: 'product-1', triggeredBySkuId: 'sku-1',
-      // stockAtTrigger: 2 } }; assert tx.like.findMany's where clause
-      // excludes users with a confirmed (not pending/cancelled) order
-      // containing this product — see decisions.md for the exact shape;
-      // assert result is ['notification-1', 'notification-2'].
-      void result;
+      expect(tx.lowStockEvent.create).toHaveBeenCalledWith({
+        data: {
+          productId: 'product-1',
+          triggeredBySkuId: 'sku-1',
+          stockAtTrigger: 2,
+        },
+      });
+      expect(tx.like.findMany).toHaveBeenCalledWith({
+        where: {
+          productId: 'product-1',
+          user: {
+            orders: {
+              none: {
+                status: { notIn: [OrderStatus.pending, OrderStatus.cancelled] },
+                items: { some: { productId: 'product-1' } },
+              },
+            },
+          },
+        },
+        select: { userId: true },
+      });
+      expect(result).toEqual(['notification-1', 'notification-2']);
     });
 
     it('treats the partial-unique-index conflict as "someone else already opened it", not an error', async () => {
@@ -96,9 +111,8 @@ describe('LowStockService', () => {
         1,
       );
 
-      // TODO(testing agent): assert tx.like.findMany was NOT called; assert
-      // result is [].
-      void result;
+      expect(tx.like.findMany).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
     });
 
     it('rethrows an unrelated database error', async () => {
@@ -114,16 +128,16 @@ describe('LowStockService', () => {
     it('does nothing when the resulting stock is still at or below the threshold', async () => {
       await service.resolveIfCrossedAbove(tx as never, 'product-1', 3);
 
-      // TODO(testing agent): assert tx.lowStockEvent.updateMany was NOT
-      // called.
+      expect(tx.lowStockEvent.updateMany).not.toHaveBeenCalled();
     });
 
     it('resolves the open event once stock crosses back above the threshold', async () => {
       await service.resolveIfCrossedAbove(tx as never, 'product-1', 4);
 
-      // TODO(testing agent): assert tx.lowStockEvent.updateMany was called
-      // with { where: { productId: 'product-1', resolvedAt: null }, data:
-      // { resolvedAt: expect.any(Date) } }.
+      expect(tx.lowStockEvent.updateMany).toHaveBeenCalledWith({
+        where: { productId: 'product-1', resolvedAt: null },
+        data: { resolvedAt: expect.any(Date) as Date },
+      });
     });
   });
 
@@ -137,9 +151,10 @@ describe('LowStockService', () => {
     it('adds one job per notification id', async () => {
       await service.enqueueNotifications(['notification-1', 'notification-2']);
 
-      // TODO(testing agent): assert queue.addBulk was called with jobs named
-      // 'send' carrying { notificationId: 'notification-1' } and
-      // { notificationId: 'notification-2' }, in order.
+      expect(queue.addBulk).toHaveBeenCalledWith([
+        { name: 'send', data: { notificationId: 'notification-1' } },
+        { name: 'send', data: { notificationId: 'notification-2' } },
+      ]);
     });
   });
 });

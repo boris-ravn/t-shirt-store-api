@@ -2,20 +2,23 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CartService } from '../cart/cart.service';
 import { CartEmptyException } from '../cart/exceptions/cart-empty.exception';
-import { OrderStatus, UserRole } from '../generated/prisma/enums';
+import { OrderStatus } from '../generated/prisma/enums';
 import { LowStockService } from '../notifications/low-stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeExhaustedException } from '../promos/exceptions/promo-code-exhausted.exception';
 import { PromoCodeExpiredException } from '../promos/exceptions/promo-code-expired.exception';
 import { PromoCodeInvalidException } from '../promos/exceptions/promo-code-invalid.exception';
 import { PromoMinimumNotMetException } from '../promos/exceptions/promo-minimum-not-met.exception';
+import { mockTransactionPassthrough } from '../test-utils/prisma-transaction-mock';
+import {
+  buildClientUser,
+  buildDeliveryUser,
+  buildManagerUser,
+} from '../test-utils/user-fixtures';
 import { InsufficientStockException } from './exceptions/insufficient-stock.exception';
 import { InvalidStatusTransitionException } from './exceptions/invalid-status-transition.exception';
 import { OrdersService } from './orders.service';
 
-// $transaction mocking follows auth.service.spec.ts's pattern: the callback
-// runs against the same mock object as `prisma`, so tx.order.x ===
-// prisma.order.x for assertion purposes.
 describe('OrdersService', () => {
   let service: OrdersService;
   let prisma: {
@@ -50,9 +53,9 @@ describe('OrdersService', () => {
     resolveIfCrossedAbove: jest.Mock;
   };
 
-  const clientUser = { id: 'client-1', role: UserRole.client };
-  const managerUser = { id: 'manager-1', role: UserRole.manager };
-  const deliveryUser = { id: 'delivery-1', role: UserRole.delivery_person };
+  const clientUser = buildClientUser();
+  const managerUser = buildManagerUser();
+  const deliveryUser = buildDeliveryUser();
 
   // Shape matches CartItemResponseDto's nested SkuResponseDto (price as
   // Money, not the raw Prisma column) — this is what cartService.getOrCreate
@@ -142,9 +145,7 @@ describe('OrdersService', () => {
       $executeRaw: jest.fn(),
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation(
-      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
-    );
+    mockTransactionPassthrough(prisma);
     prisma.cartItem.deleteMany.mockResolvedValue({ count: 1 });
     prisma.sku.update.mockResolvedValue({ productId: 'product-1', stock: 10 });
     cartService = { getOrCreate: jest.fn() };

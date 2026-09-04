@@ -3,6 +3,10 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImageUrlService } from '../../storage/image-url.service';
+import {
+  buildClientUser,
+  buildManagerUser,
+} from '../../test-utils/user-fixtures';
 import { ProductsService } from './products.service';
 
 describe('ProductsService', () => {
@@ -19,8 +23,8 @@ describe('ProductsService', () => {
     category: { findUnique: jest.Mock };
   };
 
-  const managerUser = { id: 'manager-1', role: 'manager' as const };
-  const clientUser = { id: 'client-1', role: 'client' as const };
+  const managerUser = buildManagerUser();
+  const clientUser = buildClientUser();
 
   // The include shape products.service.ts actually asks Prisma for —
   // non-deleted SKUs only, images in position order.

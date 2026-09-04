@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { buildUniqueConstraintError } from '../../test-utils/prisma-error-fixtures';
 import { CategoriesService } from './categories.service';
 import { CategoryNameTakenException } from './exceptions/category-name-taken.exception';
 import { CategoryNotEmptyException } from './exceptions/category-not-empty.exception';
@@ -27,23 +27,8 @@ describe('CategoriesService', () => {
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   };
 
-  // A real PrismaClientKnownRequestError (not a plain Error with .code
-  // bolted on) — isUniqueConstraintViolation checks `instanceof`, so it
-  // must be the actual class. Meta shape matches what @prisma/adapter-pg's
-  // P2002 actually carries (see prisma-error.util.ts), though
-  // CategoriesService doesn't inspect meta at all — this only matters for
-  // accuracy.
-  const uniqueConstraintError = new Prisma.PrismaClientKnownRequestError(
-    'Unique constraint failed',
-    {
-      code: 'P2002',
-      clientVersion: '7.10.0',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'categories_name_key' } },
-        },
-      },
-    },
+  const uniqueConstraintError = buildUniqueConstraintError(
+    'categories_name_key',
   );
 
   beforeEach(async () => {

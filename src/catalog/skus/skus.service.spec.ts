@@ -1,8 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma } from '../../generated/prisma/client';
 import { LowStockService } from '../../notifications/low-stock.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { buildUniqueConstraintError } from '../../test-utils/prisma-error-fixtures';
+import { mockTransactionPassthrough } from '../../test-utils/prisma-transaction-mock';
 import { DuplicateSkuException } from './exceptions/duplicate-sku.exception';
 import { SkuReservedException } from './exceptions/sku-reserved.exception';
 import { SkusService } from './skus.service';
@@ -33,32 +34,9 @@ describe('SkusService', () => {
     product: { deletedAt: null },
   };
 
-  // Real PrismaClientKnownRequestError instances, meta shaped like
-  // @prisma/adapter-pg's actual P2002 (not the classic meta.target
-  // string[] — see prisma-error.util.ts's own comment on why).
-  const skuCodeConflict = new Prisma.PrismaClientKnownRequestError(
-    'Unique constraint failed',
-    {
-      code: 'P2002',
-      clientVersion: '7.10.0',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'skus_sku_code_key' } },
-        },
-      },
-    },
-  );
-  const sizeColorConflict = new Prisma.PrismaClientKnownRequestError(
-    'Unique constraint failed',
-    {
-      code: 'P2002',
-      clientVersion: '7.10.0',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'skus_product_id_size_color_key' } },
-        },
-      },
-    },
+  const skuCodeConflict = buildUniqueConstraintError('skus_sku_code_key');
+  const sizeColorConflict = buildUniqueConstraintError(
+    'skus_product_id_size_color_key',
   );
 
   beforeEach(async () => {
@@ -67,9 +45,7 @@ describe('SkusService', () => {
       sku: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation(
-      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
-    );
+    mockTransactionPassthrough(prisma);
     lowStockService = { resolveIfCrossedAbove: jest.fn() };
 
     const module = await Test.createTestingModule({

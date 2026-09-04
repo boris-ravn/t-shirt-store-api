@@ -1,26 +1,16 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma } from '../generated/prisma/client';
 import {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
-  UserRole,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
+import { buildUniqueConstraintError } from '../test-utils/prisma-error-fixtures';
+import { buildClientUser } from '../test-utils/user-fixtures';
 import { OrderNotPayableException } from './exceptions/order-not-payable.exception';
 import { PaymentsService } from './payments.service';
-
-function uniqueConstraintError(indexName: string) {
-  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-    code: 'P2002',
-    clientVersion: '7.10.0',
-    meta: {
-      driverAdapterError: { cause: { constraint: { index: indexName } } },
-    },
-  });
-}
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -48,14 +38,14 @@ describe('PaymentsService', () => {
     prices: { create: jest.Mock };
   };
 
-  const pendingClaimConflict = uniqueConstraintError(
+  const pendingClaimConflict = buildUniqueConstraintError(
     'payments_order_id_pending_key',
   );
-  const activeLinkConflict = uniqueConstraintError(
+  const activeLinkConflict = buildUniqueConstraintError(
     'payment_links_sku_id_active_key',
   );
 
-  const clientUser = { id: 'client-1', role: UserRole.client };
+  const clientUser = buildClientUser();
 
   const pendingOrder = {
     id: 'order-1',

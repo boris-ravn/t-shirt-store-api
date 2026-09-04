@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { CartService } from '../cart/cart.service';
 import { CartEmptyException } from '../cart/exceptions/cart-empty.exception';
-import { Prisma } from '../generated/prisma/client';
 import { DiscountType } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildUniqueConstraintError } from '../test-utils/prisma-error-fixtures';
 import { PromoCodeTakenException } from './exceptions/promo-code-taken.exception';
 import { PromosService } from './promos.service';
 
@@ -47,18 +47,7 @@ describe('PromosService', () => {
     discountValue: 500,
   };
 
-  const codeConflict = new Prisma.PrismaClientKnownRequestError(
-    'Unique constraint failed',
-    {
-      code: 'P2002',
-      clientVersion: '7.10.0',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'promo_codes_code_key' } },
-        },
-      },
-    },
-  );
+  const codeConflict = buildUniqueConstraintError('promo_codes_code_key');
 
   const cartWithItems = (subtotalAmount: number) => ({
     id: 'cart-1',

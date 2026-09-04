@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../generated/prisma/client';
 import {
@@ -109,6 +110,10 @@ describe('StripeWebhookService', () => {
     service = module.get(StripeWebhookService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('constructEvent', () => {
     it('delegates to stripe.webhooks.constructEvent', () => {
       const rawBody = Buffer.from('{}');
@@ -188,12 +193,17 @@ describe('StripeWebhookService', () => {
       prisma.order.findUnique.mockResolvedValue({
         status: OrderStatus.cancelled,
       });
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): jest.spyOn(Logger.prototype, 'warn') before
-      // the act step and assert it was called with a message naming
-      // order-1 and pi_123.
+      expect(prisma.order.findUnique).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        select: { status: true },
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Order order-1 was already cancelled when pi_123 succeeded — Stripe charged the customer but no stock, payment, or shipping record was written. Needs manual reconciliation.',
+      );
     });
 
     it('decrements stock and reservedStock together for every order item', async () => {
@@ -310,12 +320,17 @@ describe('StripeWebhookService', () => {
       prisma.order.findUnique.mockResolvedValue({
         status: OrderStatus.cancelled,
       });
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): jest.spyOn(Logger.prototype, 'warn') before
-      // the act step and assert it was called with a message naming
-      // order-2 and cs_123.
+      expect(prisma.order.findUnique).toHaveBeenCalledWith({
+        where: { id: 'order-2' },
+        select: { status: true },
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Order order-2 was already cancelled when cs_123 succeeded — Stripe charged the customer but no stock, payment, or shipping record was written. Needs manual reconciliation.',
+      );
     });
 
     it('corrects order_item.quantity and the order total from the real Stripe line items, not the original request', async () => {

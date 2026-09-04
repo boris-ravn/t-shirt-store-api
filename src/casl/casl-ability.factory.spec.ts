@@ -1,4 +1,8 @@
-import { UserRole } from '../generated/prisma/enums';
+import {
+  buildClientUser,
+  buildDeliveryUser,
+  buildManagerUser,
+} from '../test-utils/user-fixtures';
 import {
   AppAction,
   AppSubject,
@@ -11,10 +15,7 @@ describe('CaslAbilityFactory', () => {
   const subjects: AppSubject[] = ['Category', 'Product', 'Sku'];
 
   describe('manager', () => {
-    const ability = factory.createForUser({
-      id: 'user-1',
-      role: UserRole.manager,
-    });
+    const ability = factory.createForUser(buildManagerUser());
 
     it.each(subjects)(
       'can manage (create/read/update/delete) %s',
@@ -34,10 +35,7 @@ describe('CaslAbilityFactory', () => {
   });
 
   describe('client', () => {
-    const ability = factory.createForUser({
-      id: 'user-1',
-      role: UserRole.client,
-    });
+    const ability = factory.createForUser(buildClientUser());
 
     it.each(subjects)('can read %s', (subject) => {
       expect(ability.can('read', subject)).toBe(true);
@@ -61,10 +59,7 @@ describe('CaslAbilityFactory', () => {
   // that fallthrough directly, instead of trusting that "non-manager"
   // generalizes correctly from the client case alone.
   describe('delivery_person (non-manager fallthrough)', () => {
-    const ability = factory.createForUser({
-      id: 'user-1',
-      role: UserRole.delivery_person,
-    });
+    const ability = factory.createForUser(buildDeliveryUser());
 
     it.each(subjects)('can read %s', (subject) => {
       expect(ability.can('read', subject)).toBe(true);
@@ -91,20 +86,14 @@ describe('CaslAbilityFactory', () => {
       ];
 
       it(`client can manage ${clientOnlySubject}`, () => {
-        const ability = factory.createForUser({
-          id: 'user-1',
-          role: UserRole.client,
-        });
+        const ability = factory.createForUser(buildClientUser());
         expect(ability.can('manage', clientOnlySubject)).toBe(true);
       });
 
       it.each(allActions)(
         `manager cannot %s ${clientOnlySubject}`,
         (action) => {
-          const ability = factory.createForUser({
-            id: 'user-1',
-            role: UserRole.manager,
-          });
+          const ability = factory.createForUser(buildManagerUser());
           expect(ability.cannot(action, clientOnlySubject)).toBe(true);
         },
       );
@@ -112,10 +101,7 @@ describe('CaslAbilityFactory', () => {
       it.each(allActions)(
         `delivery_person cannot %s ${clientOnlySubject}`,
         (action) => {
-          const ability = factory.createForUser({
-            id: 'user-1',
-            role: UserRole.delivery_person,
-          });
+          const ability = factory.createForUser(buildDeliveryUser());
           expect(ability.cannot(action, clientOnlySubject)).toBe(true);
         },
       );
@@ -135,44 +121,29 @@ describe('CaslAbilityFactory', () => {
     ];
 
     it('manager can manage PromoCode', () => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.manager,
-      });
+      const ability = factory.createForUser(buildManagerUser());
       expect(ability.can('manage', 'PromoCode')).toBe(true);
     });
 
     it('manager cannot apply PromoCode, despite manage', () => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.manager,
-      });
+      const ability = factory.createForUser(buildManagerUser());
       expect(ability.cannot('apply', 'PromoCode')).toBe(true);
     });
 
     it('client can apply PromoCode', () => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.client,
-      });
+      const ability = factory.createForUser(buildClientUser());
       expect(ability.can('apply', 'PromoCode')).toBe(true);
     });
 
     it.each(nonApplyActions)('client cannot %s PromoCode', (action) => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.client,
-      });
+      const ability = factory.createForUser(buildClientUser());
       expect(ability.cannot(action, 'PromoCode')).toBe(true);
     });
 
     it.each([...nonApplyActions, 'apply'] as AppAction[])(
       'delivery_person cannot %s PromoCode',
       (action) => {
-        const ability = factory.createForUser({
-          id: 'user-1',
-          role: UserRole.delivery_person,
-        });
+        const ability = factory.createForUser(buildDeliveryUser());
         expect(ability.cannot(action, 'PromoCode')).toBe(true);
       },
     );
@@ -199,10 +170,7 @@ describe('CaslAbilityFactory', () => {
     it.each(['read', 'process', 'ship', 'cancel'] as AppAction[])(
       'manager can %s Order',
       (action) => {
-        const ability = factory.createForUser({
-          id: 'user-1',
-          role: UserRole.manager,
-        });
+        const ability = factory.createForUser(buildManagerUser());
         expect(ability.can(action, 'Order')).toBe(true);
       },
     );
@@ -212,20 +180,14 @@ describe('CaslAbilityFactory', () => {
         (a) => !['read', 'process', 'ship', 'cancel'].includes(a),
       ),
     )('manager cannot %s Order', (action) => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.manager,
-      });
+      const ability = factory.createForUser(buildManagerUser());
       expect(ability.cannot(action, 'Order')).toBe(true);
     });
 
     it.each(['create', 'read', 'cancel'] as AppAction[])(
       'client can %s Order',
       (action) => {
-        const ability = factory.createForUser({
-          id: 'user-1',
-          role: UserRole.client,
-        });
+        const ability = factory.createForUser(buildClientUser());
         expect(ability.can(action, 'Order')).toBe(true);
       },
     );
@@ -233,20 +195,14 @@ describe('CaslAbilityFactory', () => {
     it.each(
       allActions.filter((a) => !['create', 'read', 'cancel'].includes(a)),
     )('client cannot %s Order', (action) => {
-      const ability = factory.createForUser({
-        id: 'user-1',
-        role: UserRole.client,
-      });
+      const ability = factory.createForUser(buildClientUser());
       expect(ability.cannot(action, 'Order')).toBe(true);
     });
 
     it.each(['read', 'deliver'] as AppAction[])(
       'delivery_person can %s Order',
       (action) => {
-        const ability = factory.createForUser({
-          id: 'user-1',
-          role: UserRole.delivery_person,
-        });
+        const ability = factory.createForUser(buildDeliveryUser());
         expect(ability.can(action, 'Order')).toBe(true);
       },
     );
@@ -254,10 +210,7 @@ describe('CaslAbilityFactory', () => {
     it.each(allActions.filter((a) => !['read', 'deliver'].includes(a)))(
       'delivery_person cannot %s Order',
       (action) => {
-        const ability = factory.createForUser({
-          id: 'user-1',
-          role: UserRole.delivery_person,
-        });
+        const ability = factory.createForUser(buildDeliveryUser());
         expect(ability.cannot(action, 'Order')).toBe(true);
       },
     );

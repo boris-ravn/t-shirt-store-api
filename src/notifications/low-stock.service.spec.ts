@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { Prisma } from '../generated/prisma/client';
 import { OrderStatus } from '../generated/prisma/enums';
+import { buildUniqueConstraintError } from '../test-utils/prisma-error-fixtures';
 import { LowStockService } from './low-stock.service';
 import { STOCK_NOTIFICATIONS_QUEUE } from './notifications.constants';
 
@@ -14,19 +14,8 @@ describe('LowStockService', () => {
   };
   let queue: { addBulk: jest.Mock };
 
-  const openEventConflict = new Prisma.PrismaClientKnownRequestError(
-    'Unique constraint failed',
-    {
-      code: 'P2002',
-      clientVersion: '7.10.0',
-      meta: {
-        driverAdapterError: {
-          cause: {
-            constraint: { index: 'low_stock_events_product_id_open_key' },
-          },
-        },
-      },
-    },
+  const openEventConflict = buildUniqueConstraintError(
+    'low_stock_events_product_id_open_key',
   );
 
   beforeEach(async () => {

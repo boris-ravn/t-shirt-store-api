@@ -1,30 +1,15 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageUrlService } from '../storage/image-url.service';
+import {
+  buildRecordNotFoundError,
+  buildUniqueConstraintError,
+} from '../test-utils/prisma-error-fixtures';
 import { CartService } from './cart.service';
 
-// Same shape as the P2002 fixtures in skus.service.spec.ts — a real
-// PrismaClientKnownRequestError, not a plain object, since isUniqueConstraintViolation/
-// isRecordNotFound check `instanceof`.
-const cartUserIdConflict = new Prisma.PrismaClientKnownRequestError(
-  'Unique constraint failed',
-  {
-    code: 'P2002',
-    clientVersion: '7.10.0',
-    meta: {
-      driverAdapterError: {
-        cause: { constraint: { index: 'carts_user_id_key' } },
-      },
-    },
-  },
-);
-
-const recordNotFoundError = new Prisma.PrismaClientKnownRequestError(
-  'An operation failed because it depends on one or more records that were required but not found.',
-  { code: 'P2025', clientVersion: '7.10.0' },
-);
+const cartUserIdConflict = buildUniqueConstraintError('carts_user_id_key');
+const recordNotFoundError = buildRecordNotFoundError();
 
 describe('CartService', () => {
   let service: CartService;

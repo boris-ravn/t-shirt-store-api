@@ -1,6 +1,7 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { buildClientUser } from '../test-utils/user-fixtures';
 import { AppAbility, CaslAbilityFactory } from './casl-ability.factory';
 import { CHECK_POLICIES_KEY } from './check-policies.decorator';
 import { PoliciesGuard } from './policies.guard';
@@ -87,10 +88,7 @@ describe('PoliciesGuard', () => {
     const realGuard = new PoliciesGuard(new Reflector(), caslAbilityFactory);
 
     const result = realGuard.canActivate(
-      fakeContextWithTargets(handlerFn, classFn, {
-        id: 'user-1',
-        role: 'client',
-      }),
+      fakeContextWithTargets(handlerFn, classFn, buildClientUser()),
     );
 
     expect(result).toBe(true);
@@ -111,10 +109,7 @@ describe('PoliciesGuard', () => {
     const realGuard = new PoliciesGuard(new Reflector(), caslAbilityFactory);
 
     const result = realGuard.canActivate(
-      fakeContextWithTargets(handlerFn, classFn, {
-        id: 'user-1',
-        role: 'client',
-      }),
+      fakeContextWithTargets(handlerFn, classFn, buildClientUser()),
     );
 
     expect(result).toBe(false);
@@ -125,9 +120,7 @@ describe('PoliciesGuard', () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
     caslAbilityFactory.createForUser.mockReturnValue(fakeAbility);
 
-    const result = guard.canActivate(
-      fakeContext({ id: 'user-1', role: 'client' }),
-    );
+    const result = guard.canActivate(fakeContext(buildClientUser()));
 
     expect(result).toBe(true);
   });
@@ -138,9 +131,7 @@ describe('PoliciesGuard', () => {
     reflector.getAllAndOverride.mockReturnValue([allow, deny]);
     caslAbilityFactory.createForUser.mockReturnValue(fakeAbility);
 
-    const result = guard.canActivate(
-      fakeContext({ id: 'user-1', role: 'client' }),
-    );
+    const result = guard.canActivate(fakeContext(buildClientUser()));
 
     expect(result).toBe(false);
     expect(allow).toHaveBeenCalledWith(fakeAbility);

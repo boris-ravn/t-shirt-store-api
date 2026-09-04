@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildUserRow } from '../test-utils/user-fixtures';
 import { UpdateCurrentUserRequestDto } from './dto/update-current-user-request.dto';
 import { UsersService } from './users.service';
 
@@ -8,16 +9,7 @@ describe('UsersService', () => {
   let service: UsersService;
   let prisma: { user: { findUnique: jest.Mock; update: jest.Mock } };
 
-  const existingUser = {
-    id: 'user-1',
-    email: 'jane@example.com',
-    passwordHash: 'hashed-password',
-    firstName: 'Jane',
-    lastName: 'Doe',
-    role: 'client',
-    passwordChangedAt: null,
-    createdAt: new Date('2026-01-01T00:00:00Z'),
-  };
+  const existingUser = buildUserRow();
 
   beforeEach(async () => {
     prisma = {

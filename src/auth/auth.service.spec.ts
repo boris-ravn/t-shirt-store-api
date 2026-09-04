@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { Prisma } from '../generated/prisma/client';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildUniqueConstraintError } from '../test-utils/prisma-error-fixtures';
+import { mockTransactionPassthrough } from '../test-utils/prisma-transaction-mock';
+import { buildUserRow } from '../test-utils/user-fixtures';
 import { AuthService } from './auth.service';
 import { EmailAlreadyRegisteredException } from './exceptions/email-already-registered.exception';
 import { InvalidCredentialsException } from './exceptions/invalid-credentials.exception';
@@ -39,17 +41,7 @@ describe('AuthService', () => {
     sendPasswordChangedEmail: jest.Mock;
   };
 
-  // A plain object matching Prisma's User shape.
-  const existingUser = {
-    id: 'user-1',
-    email: 'jane@example.com',
-    passwordHash: 'hashed-password',
-    firstName: 'Jane',
-    lastName: 'Doe',
-    role: 'client',
-    passwordChangedAt: null,
-    createdAt: new Date('2026-01-01T00:00:00Z'),
-  };
+  const existingUser = buildUserRow();
 
   beforeEach(async () => {
     prisma = {
@@ -64,9 +56,7 @@ describe('AuthService', () => {
       // reference resolve to the same mock.
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation(
-      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
-    );
+    mockTransactionPassthrough(prisma);
     passwordService = {
       hash: jest.fn(),
       compare: jest.fn(),
@@ -177,15 +167,7 @@ describe('AuthService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
       passwordService.hash.mockResolvedValue('hashed-password');
       prisma.user.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '7.10.0',
-          meta: {
-            driverAdapterError: {
-              cause: { constraint: { index: 'users_email_key' } },
-            },
-          },
-        }),
+        buildUniqueConstraintError('users_email_key'),
       );
 
       await expect(service.signUp(signUpDto)).rejects.toBeInstanceOf(

@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma } from '../generated/prisma/client';
 import {
   OrderStatus,
   PaymentMethod,
@@ -9,6 +8,8 @@ import {
 import { LowStockService } from '../notifications/low-stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
+import { buildUniqueConstraintError } from '../test-utils/prisma-error-fixtures';
+import { mockTransactionPassthrough } from '../test-utils/prisma-transaction-mock';
 import { StripeWebhookService } from './stripe-webhook.service';
 
 describe('StripeWebhookService', () => {
@@ -38,17 +39,8 @@ describe('StripeWebhookService', () => {
     enqueueNotifications: jest.Mock;
   };
 
-  const eventIdConflict = new Prisma.PrismaClientKnownRequestError(
-    'Unique constraint failed',
-    {
-      code: 'P2002',
-      clientVersion: '7.10.0',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'stripe_webhook_events_pkey' } },
-        },
-      },
-    },
+  const eventIdConflict = buildUniqueConstraintError(
+    'stripe_webhook_events_pkey',
   );
 
   const paymentIntentSucceededEvent = {
@@ -96,9 +88,7 @@ describe('StripeWebhookService', () => {
       $executeRaw: jest.fn(),
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation(
-      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
-    );
+    mockTransactionPassthrough(prisma);
     prisma.sku.update.mockResolvedValue({ productId: 'product-1', stock: 10 });
     stripe = {
       webhooks: { constructEvent: jest.fn() },

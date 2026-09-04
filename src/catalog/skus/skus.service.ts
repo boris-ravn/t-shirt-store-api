@@ -83,15 +83,18 @@ export class SkusService {
   ): Promise<SkuAdminResponseDto> {
     await this.getActiveOrThrow(id);
 
-    const sku = await this.prisma.sku.update({
-      where: { id },
-      data: { stock: { increment: dto.quantity } },
+    const sku = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.sku.update({
+        where: { id },
+        data: { stock: { increment: dto.quantity } },
+      });
+      await this.lowStockService.resolveIfCrossedAbove(
+        tx,
+        updated.productId,
+        updated.stock,
+      );
+      return updated;
     });
-    await this.lowStockService.resolveIfCrossedAbove(
-      this.prisma,
-      sku.productId,
-      sku.stock,
-    );
 
     return SkuAdminResponseDto.fromEntity(sku);
   }

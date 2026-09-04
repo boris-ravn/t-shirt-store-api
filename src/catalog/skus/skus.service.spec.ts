@@ -12,6 +12,7 @@ describe('SkusService', () => {
   let prisma: {
     product: { findUnique: jest.Mock };
     sku: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
+    $transaction: jest.Mock;
   };
   let lowStockService: { resolveIfCrossedAbove: jest.Mock };
 
@@ -64,7 +65,11 @@ describe('SkusService', () => {
     prisma = {
       product: { findUnique: jest.fn() },
       sku: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
+      $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
+    );
     lowStockService = { resolveIfCrossedAbove: jest.fn() };
 
     const module = await Test.createTestingModule({

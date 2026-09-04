@@ -272,32 +272,7 @@ export class OrdersService {
         );
       }
 
-      const items = await tx.orderItem.findMany({
-        where: { orderId },
-        select: { skuId: true, quantity: true },
-      });
-      for (const item of items) {
-        await tx.sku.update({
-          where: { id: item.skuId },
-          data: isRestock
-            ? { stock: { increment: item.quantity } }
-            : { reservedStock: { decrement: item.quantity } },
-        });
-      }
-
-      const cancelled = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-      });
-      if (cancelled.promoCodeId) {
-        await tx.promoCode.update({
-          where: { id: cancelled.promoCodeId },
-          data: { timesRedeemed: { decrement: 1 } },
-        });
-      }
-
-      await tx.orderStatusHistory.create({
-        data: { orderId, status: OrderStatus.cancelled, changedBy: user.id },
-      });
+      await this.finalizeCancellation(tx, orderId, isRestock, user.id);
 
       return tx.order.findUniqueOrThrow({
         where: { id: orderId },
@@ -308,6 +283,57 @@ export class OrdersService {
     return user.role === UserRole.manager
       ? OrderAdminResponseDto.fromEntity(order)
       : OrderResponseDto.fromEntity(order);
+  }
+
+  // No ownership scoping or Restock fallback, unlike cancelOrder — a sweep
+  // only ever targets orders its own query already found pending
+  // (decisions.md).
+  async releaseStalePendingOrder(orderId: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.pending },
+        data: { status: OrderStatus.cancelled },
+      });
+      if (result.count === 0) {
+        return false;
+      }
+      await this.finalizeCancellation(tx, orderId, false, null);
+      return true;
+    });
+  }
+
+  private async finalizeCancellation(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    isRestock: boolean,
+    changedBy: string | null,
+  ): Promise<void> {
+    const items = await tx.orderItem.findMany({
+      where: { orderId },
+      select: { skuId: true, quantity: true },
+    });
+    for (const item of items) {
+      await tx.sku.update({
+        where: { id: item.skuId },
+        data: isRestock
+          ? { stock: { increment: item.quantity } }
+          : { reservedStock: { decrement: item.quantity } },
+      });
+    }
+
+    const cancelled = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    if (cancelled.promoCodeId) {
+      await tx.promoCode.update({
+        where: { id: cancelled.promoCodeId },
+        data: { timesRedeemed: { decrement: 1 } },
+      });
+    }
+
+    await tx.orderStatusHistory.create({
+      data: { orderId, status: OrderStatus.cancelled, changedBy },
+    });
   }
 
   async processOrder(

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../generated/prisma/client';
 import {
@@ -13,7 +14,7 @@ describe('StripeWebhookService', () => {
   let service: StripeWebhookService;
   let prisma: {
     stripeWebhookEvent: { create: jest.Mock; update: jest.Mock };
-    order: { updateMany: jest.Mock };
+    order: { updateMany: jest.Mock; findUnique: jest.Mock };
     orderItem: {
       findMany: jest.Mock;
       findFirstOrThrow: jest.Mock;
@@ -76,7 +77,7 @@ describe('StripeWebhookService', () => {
   beforeEach(async () => {
     prisma = {
       stripeWebhookEvent: { create: jest.fn(), update: jest.fn() },
-      order: { updateMany: jest.fn() },
+      order: { updateMany: jest.fn(), findUnique: jest.fn() },
       orderItem: {
         findMany: jest.fn(),
         findFirstOrThrow: jest.fn(),
@@ -107,6 +108,10 @@ describe('StripeWebhookService', () => {
     }).compile();
 
     service = module.get(StripeWebhookService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('constructEvent', () => {
@@ -181,6 +186,24 @@ describe('StripeWebhookService', () => {
         where: { id: paymentIntentSucceededEvent.id },
         data: { processedAt: expect.any(Date) as Date },
       });
+    });
+
+    it('warns when the order was cancelled out from under an in-flight payment (stale-order-sweep race, decisions.md)', async () => {
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.cancelled,
+      });
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+      await service.handleEvent(paymentIntentSucceededEvent as never);
+
+      expect(prisma.order.findUnique).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        select: { status: true },
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Order order-1 was already cancelled when pi_123 succeeded — Stripe charged the customer but no stock, payment, or shipping record was written. Needs manual reconciliation.',
+      );
     });
 
     it('decrements stock and reservedStock together for every order item', async () => {
@@ -290,6 +313,24 @@ describe('StripeWebhookService', () => {
       expect(prisma.orderItem.update).not.toHaveBeenCalled();
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
       expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('warns when the order was cancelled out from under an in-flight payment (stale-order-sweep race, decisions.md)', async () => {
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.cancelled,
+      });
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+      await service.handleEvent(checkoutSessionCompletedEvent as never);
+
+      expect(prisma.order.findUnique).toHaveBeenCalledWith({
+        where: { id: 'order-2' },
+        select: { status: true },
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Order order-2 was already cancelled when cs_123 succeeded — Stripe charged the customer but no stock, payment, or shipping record was written. Needs manual reconciliation.',
+      );
     });
 
     it('corrects order_item.quantity and the order total from the real Stripe line items, not the original request', async () => {

@@ -531,6 +531,63 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('releaseStalePendingOrder', () => {
+    it('cancels the order, releases reserved stock, and returns true', async () => {
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+      prisma.orderItem.findMany.mockResolvedValue([
+        { skuId: skuA.id, quantity: 2 },
+      ]);
+      prisma.order.findUniqueOrThrow.mockResolvedValueOnce({
+        ...orderEntity,
+        promoCodeId: null,
+      });
+
+      const result = await service.releaseStalePendingOrder(orderEntity.id);
+
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: orderEntity.id, status: OrderStatus.pending },
+        data: { status: OrderStatus.cancelled },
+      });
+      expect(prisma.sku.update).toHaveBeenCalledWith({
+        where: { id: skuA.id },
+        data: { reservedStock: { decrement: 2 } },
+      });
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: orderEntity.id,
+          status: OrderStatus.cancelled,
+          changedBy: null,
+        },
+      });
+      expect(result).toBe(true);
+    });
+
+    it('releases the promo redemption slot when the stale order had one', async () => {
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+      prisma.orderItem.findMany.mockResolvedValue([]);
+      prisma.order.findUniqueOrThrow.mockResolvedValueOnce({
+        ...orderEntity,
+        promoCodeId: activePromo.id,
+      });
+
+      await service.releaseStalePendingOrder(orderEntity.id);
+
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: activePromo.id },
+        data: { timesRedeemed: { decrement: 1 } },
+      });
+    });
+
+    it('does nothing and returns false when the order is no longer pending', async () => {
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const result = await service.releaseStalePendingOrder(orderEntity.id);
+
+      expect(prisma.orderItem.findMany).not.toHaveBeenCalled();
+      expect(result).toBe(false);
+    });
+  });
+
   describe('processOrder / shipOrder / deliverOrder', () => {
     it('processOrder: paid -> processing on success', async () => {
       prisma.order.updateMany.mockResolvedValue({ count: 1 });

@@ -2,13 +2,13 @@
 
 Current-state snapshot: what this codebase is, how it's put together, and what's built versus pending — no history, no reasoning trail. That lives in [`decisions.md`](decisions.md); the data model lives in [`database/README.md`](database/README.md); the API contract's binding rules live in [`api/CONVENTIONS.md`](api/CONVENTIONS.md). This file only points at those — read this first, then follow a link when you need the "why" or the full detail.
 
-Read the root [`CLAUDE.md`](../../CLAUDE.md) and this project's [`CLAUDE.md`](../CLAUDE.md) too — they're the standing instructions, not restated here.
+Read this project's [`CLAUDE.md`](../CLAUDE.md) too — it carries the standing instructions, not restated here.
 
 ---
 
 ## What this is
 
-A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with variants, cart, orders with a status lifecycle, two Stripe payment flows, and a queue-backed low-stock notification. Built across a 4-week training module; the ERD and OpenAPI contract were designed and frozen in weeks 1–2, implementation runs weeks 3–4.
+A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with variants, cart, orders with a status lifecycle, two Stripe payment flows, and a queue-backed low-stock notification. The ERD and OpenAPI contract were designed and frozen before implementation began.
 
 ## Stack
 

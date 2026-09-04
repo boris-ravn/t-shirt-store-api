@@ -2,7 +2,7 @@
 
 ## What this is
 
-The capstone of the RAVN backend module: a REST API for a T-shirt store. Catalog with variants, cart, orders with a status lifecycle, Stripe payments in two flavours, and a queue-backed stock notification.
+A REST API for a T-shirt store: catalog with variants, cart, orders with a status lifecycle, Stripe payments in two flavours, and a queue-backed stock notification.
 
 Two documents are the contract. Both outrank anything said in chat:
 
@@ -19,7 +19,7 @@ If the code and one of those disagree, that is a bug in one of them. Name which 
 
 All 8 implementation slices are done and merged to `main`: cart, likes, promo codes, orders, payments (Stripe, both flows), the stale-pending order sweep, and stock notifications (BullMQ + Redis). The module map, stack, and what's genuinely still open are in [`docs/architecture.md`](docs/architecture.md) — that file is the current-state source of truth, not this one; it gets updated inside the same slice as the code, this section only needs a bump when the overall phase changes (design → implementation → done).
 
-No CI pipeline exists (`.github/workflows` was never created) despite the root `CLAUDE.md`'s stack table naming GitHub Actions — an explicit, recorded deferral (`decisions.md`), not an oversight.
+No CI pipeline exists (`.github/workflows` was never created) — an explicit, recorded deferral (`decisions.md`), not an oversight.
 
 ---
 
@@ -69,13 +69,18 @@ CASL, Stripe and the Nest security APIs are all heavily represented in training 
 
 ---
 
-## Project-specific commands
-
-The root `CLAUDE.md` command list applies. On top of it:
+## Commands
 
 ```bash
-docker compose up -d      # Postgres, Mailhog (:8025), MinIO (:9001), Redis — all local infra
+npm run start:dev        # dev server with watch
+npm run build             # compile
+npm run lint               # ESLint, autofix
+npm run test                # unit tests
+npm run test:e2e           # end-to-end tests
 npm run lint:openapi      # Spectral (house rules) + Redocly (base OAS validity) against docs/api/
+npx prisma migrate dev    # create and apply a migration locally
+npx prisma studio          # inspect data
+docker compose up -d       # Postgres, Mailhog (:8025), MinIO (:9001), Redis — all local infra
 ```
 
 No Stripe CLI command is needed — webhook e2e coverage uses `Stripe.webhooks.generateTestHeaderString` instead (`decisions.md`).

@@ -12,14 +12,8 @@ interface OrderAdminUserEntity {
   lastName: string;
 }
 
-interface OrderAdminPromoCodeEntity {
-  id: string;
-  code: string;
-}
-
 export interface OrderAdminEntity extends OrderEntity {
   user: OrderAdminUserEntity;
-  promoCode: OrderAdminPromoCodeEntity | null;
 }
 
 class OrderAdminUserResponseDto {
@@ -36,26 +30,14 @@ class OrderAdminUserResponseDto {
   lastName!: string;
 }
 
-class OrderAdminPromoCodeResponseDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty()
-  code!: string;
-}
-
 export class OrderAdminResponseDto extends OrderResponseDto {
   @ApiProperty({ type: OrderAdminUserResponseDto })
   user!: OrderAdminUserResponseDto;
-
-  @ApiProperty({ type: OrderAdminPromoCodeResponseDto, nullable: true })
-  promoCode!: OrderAdminPromoCodeResponseDto | null;
 
   static fromEntity(order: OrderAdminEntity): OrderAdminResponseDto {
     const dto = new OrderAdminResponseDto();
     assignOrderFields(dto, order);
     dto.user = order.user;
-    dto.promoCode = order.promoCode;
     return dto;
   }
 }

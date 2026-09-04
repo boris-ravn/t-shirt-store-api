@@ -8,7 +8,11 @@ import { CartEmptyException } from '../cart/exceptions/cart-empty.exception';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { Prisma } from '../generated/prisma/client';
-import { OrderStatus, UserRole } from '../generated/prisma/enums';
+import {
+  OrderStatus,
+  PaymentStatus,
+  UserRole,
+} from '../generated/prisma/enums';
 import { LowStockService } from '../notifications/low-stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeExhaustedException } from '../promos/exceptions/promo-code-exhausted.exception';
@@ -38,6 +42,10 @@ const ORDER_INCLUDE = {
   shippingDetails: true,
   user: { select: { id: true, email: true, firstName: true, lastName: true } },
   promoCode: { select: { id: true, code: true } },
+  payments: {
+    where: { status: PaymentStatus.succeeded },
+    select: { method: true },
+  },
 } satisfies Prisma.OrderInclude;
 
 type OrderWithRelations = Prisma.OrderGetPayload<{

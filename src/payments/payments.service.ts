@@ -20,6 +20,11 @@ import { OrderNotPayableException } from './exceptions/order-not-payable.excepti
 const ORDER_INCLUDE = {
   items: true,
   shippingDetails: true,
+  promoCode: { select: { id: true, code: true } },
+  payments: {
+    where: { status: PaymentStatus.succeeded },
+    select: { method: true },
+  },
 } satisfies Prisma.OrderInclude;
 
 type SkuWithProduct = Prisma.SkuGetPayload<{ include: { product: true } }>;

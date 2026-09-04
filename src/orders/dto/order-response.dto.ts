@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MoneyDto } from '../../common/money/money.dto';
-import { OrderStatus } from '../../generated/prisma/enums';
+import { OrderStatus, PaymentMethod } from '../../generated/prisma/enums';
 import { OrderItemResponseDto } from './order-item-response.dto';
 import { OrderShippingDetailsResponseDto } from './order-shipping-details-response.dto';
 
@@ -27,6 +27,11 @@ interface OrderShippingDetailsEntity {
   createdAt: Date;
 }
 
+interface OrderPromoCodeEntity {
+  id: string;
+  code: string;
+}
+
 export interface OrderEntity {
   id: string;
   status: OrderStatus;
@@ -37,6 +42,16 @@ export interface OrderEntity {
   shippingDetails: OrderShippingDetailsEntity | null;
   createdAt: Date;
   updatedAt: Date;
+  payments: { method: PaymentMethod }[];
+  promoCode: OrderPromoCodeEntity | null;
+}
+
+export class OrderPromoCodeResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty()
+  code!: string;
 }
 
 export class OrderResponseDto {
@@ -71,6 +86,16 @@ export class OrderResponseDto {
   @ApiProperty({ format: 'date-time' })
   updatedAt!: Date;
 
+  @ApiProperty({
+    enum: PaymentMethod,
+    nullable: true,
+    description: 'The method used to pay, once a payment has succeeded.',
+  })
+  paymentMethod!: PaymentMethod | null;
+
+  @ApiProperty({ type: OrderPromoCodeResponseDto, nullable: true })
+  promoCode!: OrderPromoCodeResponseDto | null;
+
   static fromEntity(order: OrderEntity): OrderResponseDto {
     const dto = new OrderResponseDto();
     assignOrderFields(dto, order);
@@ -93,4 +118,8 @@ export function assignOrderFields<T extends OrderResponseDto>(
     : null;
   dto.createdAt = order.createdAt;
   dto.updatedAt = order.updatedAt;
+  dto.paymentMethod = order.payments[0]?.method ?? null;
+  dto.promoCode = order.promoCode
+    ? { id: order.promoCode.id, code: order.promoCode.code }
+    : null;
 }

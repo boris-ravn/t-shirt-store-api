@@ -1,30 +1,11 @@
-import { randomUUID } from 'node:crypto';
-import { execSync } from 'node:child_process';
 import { Server } from 'node:http';
-import { ConfigService } from '@nestjs/config';
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/bootstrap';
 import { hashToken } from '../src/common/crypto/token.util';
 import { PrismaService } from '../src/prisma/prisma.service';
-
-// Every test creates its own account with a unique email so the suite stays
-// order-independent despite sharing one container/app across all tests.
-function signUpPayload(overrides: Partial<Record<string, string>> = {}) {
-  return {
-    email: `auth-e2e-${randomUUID()}@example.com`,
-    password: 'Sup3rSecret!',
-    firstName: 'Ada',
-    lastName: 'Lovelace',
-    ...overrides,
-  };
-}
+import { bootstrapE2eApp, teardownE2eApp } from './support/e2e-app';
+import { signUpPayload } from './support/fixtures';
 
 // Response-body shapes as they cross the wire (JSON), used only to type
 // supertest's otherwise-`any` `.body` — not the same identifiers as the
@@ -44,65 +25,22 @@ interface ProblemBody {
 
 jest.setTimeout(120_000);
 
-// Real Postgres via Testcontainers, migrated with `prisma migrate deploy`
-// (not `db push` — that would skip the hand-written SQL in the migration
-// file: the partial unique indexes and the stock CHECK constraint), and a
-// real Nest app built the same way main.ts does (configureApp is shared
-// between the two specifically so this suite can't silently drift from
-// what actually runs in production).
 describe('Auth (e2e)', () => {
   let container: StartedPostgreSqlContainer;
   let app: INestApplication<Server>;
   let prisma: PrismaService;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('tshirt_store_test')
-      .withUsername('tshirt_store_test')
-      .withPassword('tshirt_store_test')
-      .start();
-
-    const databaseUrl = container.getConnectionUri();
-
-    execSync('npx prisma migrate deploy', {
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        DOTENV_CONFIG_QUIET: 'true',
-      },
-      stdio: 'inherit',
-    });
-
-    // Overriding process.env.DATABASE_URL here doesn't reach PrismaService:
-    // ConfigModule.forRoot({ validate }) snapshots and validates env vars
-    // once, at AppModule's @Module() decorator evaluation (import time, via
-    // test/env-setup.ts's placeholder) — ConfigService.getOrThrow keeps
-    // serving that snapshot regardless of later process.env writes.
-    // Overriding the PrismaService provider directly with a real instance
-    // (pointed at the actual container) sidesteps that entirely.
-    const testPrismaService = new PrismaService({
-      getOrThrow: () => databaseUrl,
-    } as unknown as ConfigService);
-
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(PrismaService)
-      .useValue(testPrismaService)
-      .compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
-
-    prisma = moduleRef.get(PrismaService);
+    ({ app, prisma, container } = await bootstrapE2eApp());
   });
 
   afterAll(async () => {
-    await app.close();
-    await container.stop();
+    await teardownE2eApp({ app, prisma, container });
   });
 
   it('signs up, signs in, refreshes (rotating the token), and signs out — asserting HTTP responses and that refresh_tokens.revoked_at is set after sign-out, not just the 204', async () => {
     const agent = request(app.getHttpServer());
-    const credentials = signUpPayload();
+    const credentials = signUpPayload('auth-e2e');
 
     const signUp = await agent.post('/v1/auth/sign-up').send(credentials);
     const signUpBody = signUp.body as AuthSessionBody;
@@ -166,7 +104,7 @@ describe('Auth (e2e)', () => {
 
   it('rejects sign-up with an already-registered email (409) and does not create a duplicate account', async () => {
     const agent = request(app.getHttpServer());
-    const credentials = signUpPayload();
+    const credentials = signUpPayload('auth-e2e');
 
     await agent.post('/v1/auth/sign-up').send(credentials).expect(201);
     const duplicate = await agent.post('/v1/auth/sign-up').send(credentials);
@@ -185,7 +123,7 @@ describe('Auth (e2e)', () => {
 
   it('rejects sign-in with a wrong password or an unknown email with the same 401 body, so the response cannot be used to enumerate accounts', async () => {
     const agent = request(app.getHttpServer());
-    const credentials = signUpPayload();
+    const credentials = signUpPayload('auth-e2e');
     await agent.post('/v1/auth/sign-up').send(credentials).expect(201);
 
     const wrongPassword = await agent.post('/v1/auth/sign-in').send({
@@ -193,7 +131,7 @@ describe('Auth (e2e)', () => {
       password: 'not-the-right-password',
     });
     const unknownEmail = await agent.post('/v1/auth/sign-in').send({
-      email: signUpPayload().email,
+      email: signUpPayload('auth-e2e').email,
       password: credentials.password,
     });
 

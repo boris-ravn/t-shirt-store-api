@@ -19,9 +19,8 @@ import { AuthenticatedUser } from '../common/types/authenticated-user.interface'
 import { PaymentIntentSessionResponseDto } from './dto/payment-intent-session-response.dto';
 import { PaymentsService } from './payments.service';
 
-// Reuses Order's own 'create' ability (client-only), not a new CASL subject
-// — creating a payment intent is the continuation of checkout, and per-order
-// ownership is a service-layer 404, same as every other Order endpoint.
+// Reuses Order's own 'create' ability, not a new CASL subject — ownership
+// is a service-layer 404, same as every other Order endpoint.
 @ApiTags('payments')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

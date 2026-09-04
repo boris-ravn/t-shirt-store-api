@@ -49,8 +49,7 @@ export class PaymentsService {
       throw new OrderNotPayableException(order.status);
     }
 
-    // Fast path for a legitimate retry (e.g. a declined card): reuse the
-    // still-open intent instead of creating a duplicate Stripe object.
+    // Retry fast path — reuses an already-open intent (decisions.md).
     const existingPending = await this.prisma.payment.findFirst({
       where: {
         orderId,
@@ -96,9 +95,7 @@ export class PaymentsService {
       ) {
         throw error;
       }
-      // Lost the race to a concurrent request for this same order — cancel
-      // this now-redundant intent and hand back the winner's instead
-      // (decisions.md).
+      // Lost the claim race — cancel and reuse the winner (decisions.md).
       await this.stripe.paymentIntents.cancel(intent.id).catch(() => {});
       const winner = await this.prisma.payment.findFirstOrThrow({
         where: {
@@ -146,9 +143,8 @@ export class PaymentsService {
       throw new NotFoundException();
     }
 
-    // No stock reservation: Payment Links never reserve ahead of the charge
-    // (docs/database/README.md §6/§8) — this is the provisional total, which
-    // the webhook corrects against the real Stripe checkout session.
+    // Provisional total; the webhook overwrites it once quantity is
+    // confirmed (README §6/§8, decisions.md).
     const total = sku.price * dto.quantity;
     const order = (await this.prisma.order.create({
       data: {
@@ -195,11 +191,8 @@ export class PaymentsService {
       unit_amount: sku.price,
       product_data: { name: `${sku.product.name} (${sku.size}/${sku.color})` },
     });
-    // adjustable_quantity, because one link is reused across every buyer of
-    // this SKU (docs/database/README.md §6) — each visit's real quantity is
-    // whatever the buyer confirms on Stripe's page, not what this request
-    // happened to ask for. The webhook reconciles the order against that
-    // (decisions.md).
+    // adjustable_quantity: the real quantity is confirmed on Stripe's page,
+    // not here (decisions.md).
     const paymentLink = await this.stripe.paymentLinks.create({
       line_items: [
         {
@@ -226,9 +219,7 @@ export class PaymentsService {
       ) {
         throw error;
       }
-      // Lost the race to a concurrent first-time creation for this sku —
-      // deactivate this now-redundant link and hand back the winner's
-      // instead (decisions.md).
+      // Lost the claim race — deactivate and reuse the winner (decisions.md).
       await this.stripe.paymentLinks
         .update(paymentLink.id, { active: false })
         .catch(() => {});

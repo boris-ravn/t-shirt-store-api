@@ -9,8 +9,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
 import { StripeWebhookService } from './stripe-webhook.service';
 
-// $transaction mocking follows orders.service.spec.ts's pattern: the
-// callback runs against the same mock object as `prisma`.
 describe('StripeWebhookService', () => {
   let service: StripeWebhookService;
   let prisma: {

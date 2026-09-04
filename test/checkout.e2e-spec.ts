@@ -16,8 +16,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { STRIPE_CLIENT } from '../src/stripe/stripe.constants';
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
-// Set only when a developer has added a real Stripe test-mode key to .env
-// (see test/env-setup.ts) — gates the tests that call the actual Stripe API.
+// Gates the tests that call the actual Stripe API (see test/env-setup.ts).
 const hasRealStripeKey =
   process.env.STRIPE_SECRET_KEY !== 'sk_test_e2e_placeholder';
 
@@ -54,11 +53,6 @@ interface OrderBody {
   status: string;
 }
 
-// Real Postgres via Testcontainers, same setup as auth.e2e-spec.ts and
-// order-history.e2e-spec.ts. Covers what a fully-mocked unit test cannot:
-// the raw-SQL guarded UPDATEs actually running against Postgres, and real
-// concurrent requests racing against the real transaction isolation the
-// guards depend on.
 describe('Checkout (e2e)', () => {
   let container: StartedPostgreSqlContainer;
   let app: INestApplication;
@@ -208,13 +202,9 @@ describe('Checkout (e2e)', () => {
     expect(ordersForSku).toBe(1);
   });
 
-  // The webhook secret is real (from .env if the developer added one, a
-  // fixed placeholder otherwise — see test/env-setup.ts); either way it's
-  // the same secret this app is configured with, so
-  // stripe.webhooks.constructEvent's verification is exercised for real,
-  // satisfying the project's "never claim a webhook works without actually
-  // running verification" rule without needing a live Stripe API call or
-  // the Stripe CLI (decisions.md).
+  // WEBHOOK_SECRET is whatever this app is actually configured with (see
+  // test/env-setup.ts), so signature verification runs for real here —
+  // no Stripe CLI needed.
   describe('Stripe webhook — payment_intent.succeeded (Fulfil)', () => {
     it('rejects an incorrectly signed event with 400 and processes nothing', async () => {
       const response = await request(app.getHttpServer())
@@ -327,11 +317,8 @@ describe('Checkout (e2e)', () => {
     });
   });
 
-  // Real Postgres, but the Stripe client is stubbed for this describe block
-  // specifically — the point is proving the DB-level race guard, not
-  // exercising the real Stripe API (that's "Live Stripe API" below). Mirrors
-  // the createOrder cart-claim regression test's approach: a second app
-  // bound to the same container, one provider overridden.
+  // Second app instance, same Postgres container, Stripe client stubbed —
+  // proves the DB-level race guard without a live Stripe call.
   describe('Payment intent creation — concurrency', () => {
     let stubbedApp: INestApplication;
     let stripeStub: {
@@ -405,13 +392,8 @@ describe('Checkout (e2e)', () => {
       expect(body1.paymentId).toBe(body2.paymentId);
       expect(body1.clientSecret).toBe(body2.clientSecret);
 
-      // Which defense actually resolves the race is a timing detail, not a
-      // contract: the losing request might lose at the DB unique-constraint
-      // (paymentIntents.create called twice, one cancelled) or might find
-      // the winner's row via the existingPending fast path first
-      // (paymentIntents.create called once). Either is correct — the
-      // invariant that matters is a single surviving Payment row and no
-      // permanently orphaned Stripe intent.
+      // Which defense wins (the DB unique-constraint vs. the existingPending
+      // fast path) is a timing detail, not a contract — either is correct.
       if (stripeStub.paymentIntents.create.mock.calls.length === 2) {
         expect(stripeStub.paymentIntents.cancel).toHaveBeenCalledTimes(1);
       } else {

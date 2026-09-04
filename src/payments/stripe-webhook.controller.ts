@@ -20,9 +20,8 @@ import type { Request } from 'express';
 import Stripe from 'stripe';
 import { StripeWebhookService } from './stripe-webhook.service';
 
-// No JwtAuthGuard/PoliciesGuard — the contract sets `security: []` here,
-// Stripe isn't a CASL-scoped actor. The Stripe-Signature header is this
-// endpoint's entire authentication.
+// No JwtAuthGuard/PoliciesGuard — the Stripe-Signature header is this
+// endpoint's entire authentication (contract sets `security: []` here).
 @ApiTags('payments')
 @Controller('v1/webhooks')
 export class StripeWebhookController {

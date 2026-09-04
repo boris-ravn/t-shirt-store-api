@@ -38,9 +38,8 @@ export class StripeWebhookService {
     );
   }
 
-  // Stripe delivers at-least-once; the INSERT on the event's own id is the
-  // idempotency gate — a P2002 here means this exact event was already
-  // received, so it's skipped before any business logic runs.
+  // The INSERT on event.id is the idempotency gate — Stripe delivers
+  // at-least-once (README §6/§9).
   async handleEvent(event: Stripe.Event): Promise<void> {
     try {
       await this.prisma.stripeWebhookEvent.create({
@@ -64,8 +63,8 @@ export class StripeWebhookService {
         data: { processedAt: new Date() },
       });
     } catch (error) {
-      // processedAt stays null — identifiable for manual retry
-      // (docs/database/README.md §6). Stripe already got its 204.
+      // processedAt stays null for manual retry (README §6); Stripe already
+      // got its 204.
       this.logger.error(
         `Failed to process Stripe event ${event.id} (${event.type})`,
         error instanceof Error ? error.stack : error,
@@ -108,9 +107,8 @@ export class StripeWebhookService {
         select: { skuId: true, quantity: true },
       });
       for (const item of items) {
-        // No availability guard here (unlike Reserve/Direct sale) — Fulfil
-        // converts a reservation Reserve already verified into a real sale
-        // (docs/database/README.md §8).
+        // No availability guard — Fulfil trusts Reserve's earlier check
+        // (decisions.md).
         await tx.sku.update({
           where: { id: item.skuId },
           data: {
@@ -150,9 +148,8 @@ export class StripeWebhookService {
       );
     }
 
-    // The webhook payload never carries the real purchased quantity — a
-    // reused Payment Link lets the buyer adjust it on Stripe's page, so this
-    // is the only authoritative source (decisions.md).
+    // Real quantity is only known here — adjustable_quantity lets the buyer
+    // change it on Stripe's page (decisions.md).
     const lineItems = await this.stripe.checkout.sessions.listLineItems(
       session.id,
     );
@@ -175,9 +172,8 @@ export class StripeWebhookService {
       const item = await tx.orderItem.findFirstOrThrow({ where: { orderId } });
       await tx.orderItem.update({ where: { id: item.id }, data: { quantity } });
 
-      // 0 rows affected = the sale can't be honored from stock. The payment
-      // already succeeded on Stripe's side, so this isn't unwound here — a
-      // structural limitation of Payment Links, not a bug (README §9).
+      // 0 rows = stock guard failed after Stripe already charged; not
+      // unwound here (README §9).
       await tx.$executeRaw`
         UPDATE skus SET stock = stock - ${quantity}, updated_at = now()
         WHERE id = ${item.skuId} AND stock - reserved_stock >= ${quantity}

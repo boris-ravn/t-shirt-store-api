@@ -47,6 +47,7 @@ model User {
   createdPromoCodes   PromoCode[]
   orders              Order[]
   orderStatusChanges  OrderStatusHistory[]
+  stockNotifications  StockNotification[]
 
   @@map("users")
 }
@@ -101,11 +102,12 @@ model Product {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  category   Category       @relation(fields: [categoryId], references: [id])
-  images     ProductImage[]
-  skus       Sku[]
-  likes      Like[]
-  orderItems OrderItem[]
+  category       Category        @relation(fields: [categoryId], references: [id])
+  images         ProductImage[]
+  skus           Sku[]
+  likes          Like[]
+  orderItems     OrderItem[]
+  lowStockEvents LowStockEvent[]
 
   @@index([categoryId, createdAt])
   @@map("products")
@@ -140,10 +142,11 @@ model Sku {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  product      Product       @relation(fields: [productId], references: [id])
-  cartItems    CartItem[]
-  orderItems   OrderItem[]
-  paymentLinks PaymentLink[]
+  product        Product         @relation(fields: [productId], references: [id])
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  paymentLinks   PaymentLink[]
+  lowStockEvents LowStockEvent[]
 
   @@unique([productId, size, color])
   @@index([productId])
@@ -390,4 +393,48 @@ model StripeWebhookEvent {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("stripe_webhook_events")
+}
+
+// -------------------------------------------------------------- notifications
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+
+  @@map("notification_status")
+}
+
+// No @unique on productId — a partial index (WHERE resolved_at IS NULL) in
+// the migration guards it instead (decisions.md).
+model LowStockEvent {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId        String    @map("product_id") @db.Uuid
+  triggeredBySkuId String?   @map("triggered_by_sku_id") @db.Uuid
+  stockAtTrigger   Int       @map("stock_at_trigger")
+  resolvedAt       DateTime? @map("resolved_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  product        Product             @relation(fields: [productId], references: [id])
+  triggeredBySku Sku?                @relation(fields: [triggeredBySkuId], references: [id])
+  notifications  StockNotification[]
+
+  @@index([productId, createdAt])
+  @@map("low_stock_events")
+}
+
+model StockNotification {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lowStockEventId String             @map("low_stock_event_id") @db.Uuid
+  userId          String             @map("user_id") @db.Uuid
+  status          NotificationStatus @default(pending)
+  errorMessage    String?            @map("error_message")
+  sentAt          DateTime?          @map("sent_at") @db.Timestamptz
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  lowStockEvent LowStockEvent @relation(fields: [lowStockEventId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@unique([lowStockEventId, userId])
+  @@map("stock_notifications")
 }

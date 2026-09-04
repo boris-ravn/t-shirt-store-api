@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { execSync } from 'node:child_process';
+import { Server } from 'node:http';
 import { ConfigService } from '@nestjs/config';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -49,7 +50,7 @@ interface OrderListBody {
 // webhook path lands with Slice 5).
 describe('Order history (e2e)', () => {
   let container: StartedPostgreSqlContainer;
-  let app: INestApplication;
+  let app: INestApplication<Server>;
   let prisma: PrismaService;
 
   let clientAToken: string;

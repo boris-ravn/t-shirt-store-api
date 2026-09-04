@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { execSync } from 'node:child_process';
+import { Server } from 'node:http';
 import { ConfigService } from '@nestjs/config';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -20,7 +21,7 @@ const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 const hasRealStripeKey =
   process.env.STRIPE_SECRET_KEY !== 'sk_test_e2e_placeholder';
 
-function signedWebhookRequest(app: INestApplication, payload: object) {
+function signedWebhookRequest(app: INestApplication<Server>, payload: object) {
   const body = JSON.stringify(payload);
   const signature = Stripe.webhooks.generateTestHeaderString({
     payload: body,
@@ -55,7 +56,7 @@ interface OrderBody {
 
 describe('Checkout (e2e)', () => {
   let container: StartedPostgreSqlContainer;
-  let app: INestApplication;
+  let app: INestApplication<Server>;
   let prisma: PrismaService;
 
   beforeAll(async () => {
@@ -320,7 +321,7 @@ describe('Checkout (e2e)', () => {
   // Second app instance, same Postgres container, Stripe client stubbed —
   // proves the DB-level race guard without a live Stripe call.
   describe('Payment intent creation — concurrency', () => {
-    let stubbedApp: INestApplication;
+    let stubbedApp: INestApplication<Server>;
     let stripeStub: {
       paymentIntents: {
         create: jest.Mock;

@@ -10,7 +10,7 @@ What was decided, why, and when — kept brief on purpose.
 
 This file was pruned on 2026-09-06: entries that had become fully recoverable from code (e.g. explained by a comment at the point of use) or that carried no forward relevance (doc reorganisation, a deleted planning file) were removed rather than marked, since they never met the bar above in the first place. Nothing is lost — `git log -- docs/decisions.md` has the original, unpruned file.
 
-Binding conventions live where the work happens: [`api/CONVENTIONS.md`](api/CONVENTIONS.md) for the OpenAPI contract, the repo-root `CLAUDE.md` for code. When one of those changes, edit it there and add an entry here saying what changed and why.
+Binding conventions live where the work happens: [`api/CONVENTIONS.md`](api/CONVENTIONS.md) for the OpenAPI contract, this project's standing coding conventions for code. When one of those changes, edit it there and add an entry here saying what changed and why.
 
 ---
 
@@ -56,7 +56,7 @@ OpenAPI has no way to say "a delivery person may only write `delivered`" on a ge
 
 ### 2026-08-28 — Layering: `Controller → Service → PrismaService` directly, no repository layer
 
-Every service injects `PrismaService` directly. Chosen alongside the next entry: a repository layer here would exist mainly to be mocked in unit tests, which is exactly the "unit test wearing a costume" the root `CLAUDE.md` warns against. Applies to every future module the same way.
+Every service injects `PrismaService` directly. Chosen alongside the next entry: a repository layer here would exist mainly to be mocked in unit tests, which is exactly the "unit test wearing a costume" pattern this project avoids. Applies to every future module the same way.
 
 ### 2026-08-28 — Unit tests mock `PrismaService`; persistence correctness is an e2e concern
 
@@ -166,4 +166,4 @@ Added a smoke e2e (`test/checkout.e2e-spec.ts`, "Low-stock notification") that d
 
 ### 2026-09-04 — No CI pipeline; deferred, not built
 
-The root `CLAUDE.md`'s stack table names GitHub Actions, and every slice's regression pass (`lint`, `build`, `test`, `test:e2e`) was run locally instead of in CI. No `.github/workflows` was ever added. Deferred rather than built because every one of those checks already requires local infrastructure this training project's CI would also need to stand up (Postgres via Testcontainers works self-contained, but Redis, Mailhog, and MinIO are real `docker-compose` services the e2e suite and the low-stock smoke test depend on) — configuring that in Actions is a real task, not a five-line workflow file, and nothing in the assignment's scope depends on it running automatically. If this project continues past the training module, this is the next piece of infrastructure to add, not a gap to silently work around.
+GitHub Actions was the intended CI tool, and every slice's regression pass (`lint`, `build`, `test`, `test:e2e`) was run locally instead of in CI. No `.github/workflows` was ever added. Deferred rather than built because every one of those checks already requires local infrastructure this project's CI would also need to stand up (Postgres via Testcontainers works self-contained, but Redis, Mailhog, and MinIO are real `docker-compose` services the e2e suite and the low-stock smoke test depend on) — configuring that in Actions is a real task, not a five-line workflow file, and nothing in the current scope depends on it running automatically. If this project continues past its current scope, this is the next piece of infrastructure to add, not a gap to silently work around.

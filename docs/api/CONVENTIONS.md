@@ -2,7 +2,7 @@
 
 Binding rules for the OpenAPI contract in this directory. A spec that breaks one of these is wrong, not merely inconsistent.
 
-**Scope: the contract only.** Code conventions — file naming, DTO boundaries, error handling in services, config access, async style — live in the repo-root `CLAUDE.md` and are not repeated here. Do not start a second conventions file for them.
+**Scope: the contract only.** Code conventions — file naming, DTO boundaries, error handling in services, config access, async style — are this project's standing coding conventions and are not repeated here. Do not start a second conventions file for them.
 
 This is a living document. When a rule changes, edit it here and add an entry to [`../decisions.md`](../decisions.md) saying what changed and why.
 

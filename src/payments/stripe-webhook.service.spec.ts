@@ -1,5 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../generated/prisma/client';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
 import { StripeWebhookService } from './stripe-webhook.service';
@@ -115,10 +120,12 @@ describe('StripeWebhookService', () => {
 
       const result = service.constructEvent(rawBody, 'sig', 'whsec_test');
 
-      // TODO(testing agent): assert stripe.webhooks.constructEvent was
-      // called with (rawBody, 'sig', 'whsec_test'); assert result is the
-      // mocked event.
-      void result;
+      expect(stripe.webhooks.constructEvent).toHaveBeenCalledWith(
+        rawBody,
+        'sig',
+        'whsec_test',
+      );
+      expect(result).toBe(paymentIntentSucceededEvent);
     });
   });
 
@@ -128,8 +135,8 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): assert prisma.$transaction was NOT called;
-      // assert prisma.stripeWebhookEvent.update was NOT called.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.stripeWebhookEvent.update).not.toHaveBeenCalled();
     });
 
     it('marks processedAt on an event type with no handler (no-op)', async () => {
@@ -141,19 +148,21 @@ describe('StripeWebhookService', () => {
         data: { object: {} },
       } as never);
 
-      // TODO(testing agent): assert prisma.stripeWebhookEvent.update was
-      // called with { where: { id: 'evt_3' }, data: { processedAt:
-      // expect.any(Date) } }; assert prisma.$transaction was NOT called.
+      expect(prisma.stripeWebhookEvent.update).toHaveBeenCalledWith({
+        where: { id: 'evt_3' },
+        data: { processedAt: expect.any(Date) as Date },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('leaves processedAt unset when processing throws', async () => {
       prisma.stripeWebhookEvent.create.mockResolvedValue({});
       prisma.$transaction.mockRejectedValue(new Error('db down'));
 
-      await service.handleEvent(paymentIntentSucceededEvent as never);
-
-      // TODO(testing agent): assert prisma.stripeWebhookEvent.update was NOT
-      // called, and handleEvent resolved rather than throwing.
+      await expect(
+        service.handleEvent(paymentIntentSucceededEvent as never),
+      ).resolves.toBeUndefined();
+      expect(prisma.stripeWebhookEvent.update).not.toHaveBeenCalled();
     });
   });
 
@@ -167,10 +176,13 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): assert prisma.sku.update, prisma.payment.
-      // updateMany, prisma.orderStatusHistory.create were NOT called; assert
-      // prisma.stripeWebhookEvent.update WAS called (processing "succeeded"
-      // even though it did nothing).
+      expect(prisma.sku.update).not.toHaveBeenCalled();
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+      expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(prisma.stripeWebhookEvent.update).toHaveBeenCalledWith({
+        where: { id: paymentIntentSucceededEvent.id },
+        data: { processedAt: expect.any(Date) as Date },
+      });
     });
 
     it('decrements stock and reservedStock together for every order item', async () => {
@@ -181,10 +193,10 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): assert prisma.sku.update was called with
-      // { where: { id: 'sku-1' }, data: { stock: { decrement: 2 },
-      // reservedStock: { decrement: 2 } } } — no availability guard, unlike
-      // Reserve/Direct sale.
+      expect(prisma.sku.update).toHaveBeenCalledWith({
+        where: { id: 'sku-1' },
+        data: { stock: { decrement: 2 }, reservedStock: { decrement: 2 } },
+      });
     });
 
     it('marks the matching pending Payment row succeeded', async () => {
@@ -193,9 +205,13 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): assert prisma.payment.updateMany was called
-      // with { where: { stripePaymentIntentId: 'pi_123', status: 'pending'
-      // }, data: { status: 'succeeded' } }.
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          stripePaymentIntentId: 'pi_123',
+          status: PaymentStatus.pending,
+        },
+        data: { status: PaymentStatus.succeeded },
+      });
     });
 
     it('writes order_shipping_details when the intent carries a shipping address', async () => {
@@ -224,8 +240,19 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(eventWithShipping as never);
 
-      // TODO(testing agent): assert prisma.orderShippingDetails.create's
-      // data matches the shipping object above, keyed on orderId: 'order-1'.
+      expect(prisma.orderShippingDetails.create).toHaveBeenCalledWith({
+        data: {
+          orderId: 'order-1',
+          recipientName: 'Ada Lovelace',
+          phone: '+15551234',
+          line1: '1 Infinite Loop',
+          line2: null,
+          city: 'Cupertino',
+          state: 'CA',
+          postalCode: '95014',
+          country: 'US',
+        },
+      });
     });
 
     it('inserts the paid status-history row with changedBy: null (webhook-driven, no human)', async () => {
@@ -234,9 +261,9 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(paymentIntentSucceededEvent as never);
 
-      // TODO(testing agent): assert prisma.orderStatusHistory.create was
-      // called with { data: { orderId: 'order-1', status: 'paid',
-      // changedBy: null } }.
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: { orderId: 'order-1', status: OrderStatus.paid, changedBy: null },
+      });
     });
   });
 
@@ -262,8 +289,9 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert prisma.orderItem.update, prisma.
-      // $executeRaw, prisma.payment.create were NOT called.
+      expect(prisma.orderItem.update).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.payment.create).not.toHaveBeenCalled();
     });
 
     it('corrects order_item.quantity and the order total from the real Stripe line items, not the original request', async () => {
@@ -271,12 +299,17 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert stripe.checkout.sessions.listLineItems
-      // was called with 'cs_123'; assert prisma.order.updateMany's data
-      // includes { status: 'paid', subtotal: 3998, total: 3998 } (from
-      // session.amount_total, not the provisional order); assert
-      // prisma.orderItem.update was called with { where: { id: 'item-1' },
-      // data: { quantity: 3 } } (from the line item, not the original DTO).
+      expect(stripe.checkout.sessions.listLineItems).toHaveBeenCalledWith(
+        'cs_123',
+      );
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: 'order-2', status: OrderStatus.pending },
+        data: { status: OrderStatus.paid, subtotal: 3998, total: 3998 },
+      });
+      expect(prisma.orderItem.update).toHaveBeenCalledWith({
+        where: { id: 'item-1' },
+        data: { quantity: 3 },
+      });
     });
 
     it('proceeds to mark the order paid even when the Direct-sale stock guard affects 0 rows', async () => {
@@ -289,9 +322,8 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert prisma.payment.create and
-      // prisma.orderStatusHistory.create WERE still called — the payment
-      // already succeeded on Stripe's side, this isn't unwound (README §9).
+      expect(prisma.payment.create).toHaveBeenCalled();
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalled();
     });
 
     it('deactivates the payment link once available stock hits zero', async () => {
@@ -304,9 +336,10 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert prisma.paymentLink.updateMany was
-      // called with { where: { skuId: 'sku-2', deactivatedAt: null }, data:
-      // { deactivatedAt: expect.any(Date) } }.
+      expect(prisma.paymentLink.updateMany).toHaveBeenCalledWith({
+        where: { skuId: 'sku-2', deactivatedAt: null },
+        data: { deactivatedAt: expect.any(Date) as Date },
+      });
     });
 
     it('does not deactivate the payment link while stock remains available', async () => {
@@ -319,8 +352,7 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert prisma.paymentLink.updateMany was NOT
-      // called.
+      expect(prisma.paymentLink.updateMany).not.toHaveBeenCalled();
     });
 
     it('creates a succeeded Payment row for the payment-link method', async () => {
@@ -329,10 +361,17 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(checkoutSessionCompletedEvent as never);
 
-      // TODO(testing agent): assert prisma.payment.create's data equals
-      // { orderId: 'order-2', method: 'payment_link', paymentLinkId:
-      // 'link-1', stripeCheckoutSessionId: 'cs_123', amount: 3998,
-      // currency: 'usd', status: 'succeeded' }.
+      expect(prisma.payment.create).toHaveBeenCalledWith({
+        data: {
+          orderId: 'order-2',
+          method: PaymentMethod.payment_link,
+          paymentLinkId: 'link-1',
+          stripeCheckoutSessionId: 'cs_123',
+          amount: 3998,
+          currency: 'usd',
+          status: PaymentStatus.succeeded,
+        },
+      });
     });
 
     it('writes order_shipping_details from collected_information when present', async () => {
@@ -361,9 +400,19 @@ describe('StripeWebhookService', () => {
 
       await service.handleEvent(eventWithShipping as never);
 
-      // TODO(testing agent): assert prisma.orderShippingDetails.create's
-      // data matches the shipping_details object above, keyed on orderId:
-      // 'order-2', with phone from session.customer_details.phone.
+      expect(prisma.orderShippingDetails.create).toHaveBeenCalledWith({
+        data: {
+          orderId: 'order-2',
+          recipientName: 'Ada Lovelace',
+          phone: null,
+          line1: '1 Infinite Loop',
+          line2: null,
+          city: 'Cupertino',
+          state: 'CA',
+          postalCode: '95014',
+          country: 'US',
+        },
+      });
     });
 
     it('throws when the session carries no client_reference_id', async () => {
@@ -377,10 +426,10 @@ describe('StripeWebhookService', () => {
         },
       };
 
-      await service.handleEvent(eventWithoutOrder as never);
-
-      // TODO(testing agent): assert prisma.stripeWebhookEvent.update was NOT
-      // called (processedAt stays null — a partial failure to retry).
+      await expect(
+        service.handleEvent(eventWithoutOrder as never),
+      ).resolves.toBeUndefined();
+      expect(prisma.stripeWebhookEvent.update).not.toHaveBeenCalled();
     });
   });
 });

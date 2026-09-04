@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { OrderStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from './orders.service';
 import { StaleOrderSweepService } from './stale-order-sweep.service';
@@ -27,16 +28,23 @@ describe('StaleOrderSweepService', () => {
     service = module.get(StaleOrderSweepService);
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('queries pending orders older than STALE_ORDER_MAX_AGE_MINUTES', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-01T12:00:00Z'));
     prisma.order.findMany.mockResolvedValue([]);
 
     await service.sweep();
 
-    // TODO(testing agent): assert prisma.order.findMany was called with
-    // { where: { status: OrderStatus.pending, createdAt: { lt: <a Date
-    // roughly 30 minutes before now, per the mocked config value> } },
-    // select: { id: true } } — use a fake timer or an approximate Date
-    // comparison, not an exact Date.now() match.
+    expect(prisma.order.findMany).toHaveBeenCalledWith({
+      where: {
+        status: OrderStatus.pending,
+        createdAt: { lt: new Date('2026-01-01T11:30:00Z') },
+      },
+      select: { id: true },
+    });
   });
 
   it('cancels each matched order through OrdersService.releaseStalePendingOrder', async () => {
@@ -48,10 +56,15 @@ describe('StaleOrderSweepService', () => {
 
     await service.sweep();
 
-    // TODO(testing agent): assert ordersService.releaseStalePendingOrder was
-    // called exactly twice, once with 'order-1' and once with 'order-2' — a
-    // sweep calls the shared cancellation path per order, it doesn't
-    // re-implement the stock/promo release itself.
+    expect(ordersService.releaseStalePendingOrder).toHaveBeenCalledTimes(2);
+    expect(ordersService.releaseStalePendingOrder).toHaveBeenNthCalledWith(
+      1,
+      'order-1',
+    );
+    expect(ordersService.releaseStalePendingOrder).toHaveBeenNthCalledWith(
+      2,
+      'order-2',
+    );
   });
 
   it('is a no-op when no order is stale', async () => {
@@ -59,7 +72,6 @@ describe('StaleOrderSweepService', () => {
 
     await service.sweep();
 
-    // TODO(testing agent): assert ordersService.releaseStalePendingOrder was
-    // NOT called.
+    expect(ordersService.releaseStalePendingOrder).not.toHaveBeenCalled();
   });
 });

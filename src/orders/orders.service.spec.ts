@@ -544,16 +544,22 @@ describe('OrdersService', () => {
 
       const result = await service.releaseStalePendingOrder(orderEntity.id);
 
-      // TODO(testing agent): assert prisma.order.updateMany was called with
-      // { where: { id: orderEntity.id, status: OrderStatus.pending },
-      // data: { status: OrderStatus.cancelled } } — no ownership clause,
-      // unlike cancelOrder; assert prisma.sku.update was called with
-      // { where: { id: skuA.id }, data: { reservedStock: { decrement: 2 } } }
-      // (Release, never Restock — a sweep only ever finds pending orders);
-      // assert prisma.orderStatusHistory.create was called with
-      // { data: { orderId: orderEntity.id, status: OrderStatus.cancelled,
-      // changedBy: null } } (no human triggered this); assert result is true.
-      void result;
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: orderEntity.id, status: OrderStatus.pending },
+        data: { status: OrderStatus.cancelled },
+      });
+      expect(prisma.sku.update).toHaveBeenCalledWith({
+        where: { id: skuA.id },
+        data: { reservedStock: { decrement: 2 } },
+      });
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: {
+          orderId: orderEntity.id,
+          status: OrderStatus.cancelled,
+          changedBy: null,
+        },
+      });
+      expect(result).toBe(true);
     });
 
     it('releases the promo redemption slot when the stale order had one', async () => {
@@ -566,8 +572,10 @@ describe('OrdersService', () => {
 
       await service.releaseStalePendingOrder(orderEntity.id);
 
-      // TODO(testing agent): assert prisma.promoCode.update was called with
-      // { where: { id: activePromo.id }, data: { timesRedeemed: { decrement: 1 } } }.
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: activePromo.id },
+        data: { timesRedeemed: { decrement: 1 } },
+      });
     });
 
     it('does nothing and returns false when the order is no longer pending', async () => {
@@ -575,10 +583,8 @@ describe('OrdersService', () => {
 
       const result = await service.releaseStalePendingOrder(orderEntity.id);
 
-      // TODO(testing agent): assert prisma.orderItem.findMany was NOT called
-      // (the guarded UPDATE affecting 0 rows means nothing else should run);
-      // assert result is false.
-      void result;
+      expect(prisma.orderItem.findMany).not.toHaveBeenCalled();
+      expect(result).toBe(false);
     });
   });
 

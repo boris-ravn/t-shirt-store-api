@@ -1,9 +1,5 @@
 # CLAUDE.md — t-shirt-store-api
 
-The repo-root `../CLAUDE.md` is the authority on how we work: planning before implementing, layering and testing decisions, conventions, hard rules, git. It applies here in full and is deliberately **not** repeated below. This file covers only what is specific to this codebase.
-
----
-
 ## What this is
 
 The capstone of the RAVN backend module: a REST API for a T-shirt store. Catalog with variants, cart, orders with a status lifecycle, Stripe payments in two flavours, and a queue-backed stock notification.
@@ -19,33 +15,19 @@ If the code and one of those disagree, that is a bug in one of them. Name which 
 
 ---
 
-## Current state (2026-08-21)
+## Current state (2026-09-04)
 
-Empty Nest scaffold. No feature code, no Prisma, no database, no `.env`. Dependencies are the stock `nest new` set and nothing more.
+All 8 implementation slices are done and merged to `main`: cart, likes, promo codes, orders, payments (Stripe, both flows), the stale-pending order sweep, and stock notifications (BullMQ + Redis). The module map, stack, and what's genuinely still open are in [`docs/architecture.md`](docs/architecture.md) — that file is the current-state source of truth, not this one; it gets updated inside the same slice as the code, this section only needs a bump when the overall phase changes (design → implementation → done).
 
-The OpenAPI contract is being designed now. Implementation has not started, so do not propose code that assumes a module, entity or endpoint exists — open the contract and the DBML first.
+No CI pipeline exists (`.github/workflows` was never created) despite the root `CLAUDE.md`'s stack table naming GitHub Actions — an explicit, recorded deferral (`decisions.md`), not an oversight.
 
 ---
 
-## Intended module shape
+## Module shape
 
-Derived from the ERD's table groups. **None of these folders exist yet**; this is the target, not a description of what is on disk.
+One Nest module per bounded feature, in its own folder (`auth`, `users`, `catalog`, `cart`, `likes`, `orders`, `payments`, `promos`, `notifications`, plus shared infrastructure — `prisma`, `config`, `common`, `mail`, `storage`, `stripe`, `casl`). The authoritative, current module list with what each one owns is `docs/architecture.md`'s Module map — not repeated here, so there is only one place for it to go stale.
 
-| Module | Owns |
-|---|---|
-| `auth` | sign up / in / out, refresh tokens, forgot + reset password |
-| `users` | profile, role (never set from a request body) |
-| `catalog` | categories, products, product images (S3), SKUs |
-| `cart` | cart, cart items |
-| `likes` | product likes |
-| `orders` | orders, items, status transitions, status history, order history queries |
-| `payments` | payment links, payment intents, Stripe webhooks |
-| `promos` | promo codes, validation, reserve / release |
-| `notifications` | low-stock events, stock notification jobs, email |
-
-Plus shared infrastructure: `prisma`, `config`, `common` (filters, guards, decorators, pipes).
-
-One Nest module per bounded feature, in its own folder. CASL abilities live with the feature they guard, not in one global rules file — a single file of every rule is the shape that quietly grants a client another client's orders.
+CASL abilities live with the feature they guard, not in one global rules file — a single file of every rule is the shape that quietly grants a client another client's orders.
 
 ---
 
@@ -81,7 +63,7 @@ If the ERD itself turns out to be wrong, that is a deliberate change to the ERD,
 CASL, Stripe and the Nest security APIs are all heavily represented in training data at versions we are not running. The failure mode is not an invented API, it is a **superseded** one presented with full confidence.
 
 - Cite a doc URL or a `file:line` for every CASL and Stripe API claim. The question is "does this API still exist with these arguments", not "does this look right".
-- Never claim a webhook implementation works without running it against the Stripe CLI. Signature verification either verifies or it does not.
+- Never claim a webhook implementation works without running real signature verification — the Stripe CLI, or `Stripe.webhooks.generateTestHeaderString` against the app's own configured secret (what `checkout.e2e-spec.ts` actually does, `decisions.md`). Either is fine; a mocked `constructEvent` is not.
 - Do not write the assertions for code written in the same session; it will assert the behaviour produced, including the wrong parts. Offer the mocking setup, let Boris write the assertions.
 - Authorization is the worst place in this project to accept unexamined code. An ability that looks right and leaks another client's orders passes every test nobody thought to write.
 
@@ -89,4 +71,11 @@ CASL, Stripe and the Nest security APIs are all heavily represented in training 
 
 ## Project-specific commands
 
-The root `CLAUDE.md` command list applies. Nothing beyond the stock Nest scripts exists yet — Prisma, Stripe CLI and Redis commands get added to `package.json` as those pieces land, not invented at the call site.
+The root `CLAUDE.md` command list applies. On top of it:
+
+```bash
+docker compose up -d      # Postgres, Mailhog (:8025), MinIO (:9001), Redis — all local infra
+npm run lint:openapi      # Spectral (house rules) + Redocly (base OAS validity) against docs/api/
+```
+
+No Stripe CLI command is needed — webhook e2e coverage uses `Stripe.webhooks.generateTestHeaderString` instead (`decisions.md`).

@@ -9,6 +9,7 @@ import {
   PaymentStatus,
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
+import { uniqueConstraintIndexName } from '../prisma/prisma-error.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { STRIPE_CLIENT } from '../stripe/stripe.constants';
 import { CreatePaymentLinkCheckoutRequestDto } from './dto/create-payment-link-checkout-request.dto';
@@ -48,6 +49,19 @@ export class PaymentsService {
       throw new OrderNotPayableException(order.status);
     }
 
+    // Fast path for a legitimate retry (e.g. a declined card): reuse the
+    // still-open intent instead of creating a duplicate Stripe object.
+    const existingPending = await this.prisma.payment.findFirst({
+      where: {
+        orderId,
+        method: PaymentMethod.payment_intent,
+        status: PaymentStatus.pending,
+      },
+    });
+    if (existingPending) {
+      return this.reusePaymentIntent(existingPending);
+    }
+
     const currency = STORE_CURRENCY.toLowerCase();
     const intent = await this.stripe.paymentIntents.create({
       amount: order.total,
@@ -61,20 +75,62 @@ export class PaymentsService {
       );
     }
 
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId: order.id,
-        method: PaymentMethod.payment_intent,
-        stripePaymentIntentId: intent.id,
-        amount: order.total,
-        currency,
-      },
-    });
+    try {
+      const payment = await this.prisma.payment.create({
+        data: {
+          orderId: order.id,
+          method: PaymentMethod.payment_intent,
+          stripePaymentIntentId: intent.id,
+          amount: order.total,
+          currency,
+        },
+      });
+      return PaymentIntentSessionResponseDto.of(
+        payment.id,
+        intent.client_secret,
+        order.total,
+      );
+    } catch (error) {
+      if (
+        uniqueConstraintIndexName(error) !== 'payments_order_id_pending_key'
+      ) {
+        throw error;
+      }
+      // Lost the race to a concurrent request for this same order — cancel
+      // this now-redundant intent and hand back the winner's instead
+      // (decisions.md).
+      await this.stripe.paymentIntents.cancel(intent.id).catch(() => {});
+      const winner = await this.prisma.payment.findFirstOrThrow({
+        where: {
+          orderId: order.id,
+          method: PaymentMethod.payment_intent,
+          status: PaymentStatus.pending,
+        },
+      });
+      return this.reusePaymentIntent(winner);
+    }
+  }
 
+  private async reusePaymentIntent(payment: {
+    id: string;
+    amount: number;
+    stripePaymentIntentId: string | null;
+  }): Promise<PaymentIntentSessionResponseDto> {
+    if (!payment.stripePaymentIntentId) {
+      throw new Error(`Payment ${payment.id} has no stripePaymentIntentId.`);
+    }
+    const intent = await this.stripe.paymentIntents.retrieve(
+      payment.stripePaymentIntentId,
+    );
+    if (!intent.client_secret) {
+      throw new Error(
+        'Stripe returned no client_secret for the retrieved payment intent.',
+      );
+    }
     return PaymentIntentSessionResponseDto.of(
       payment.id,
       intent.client_secret,
-      order.total,
+      payment.amount,
     );
   }
 
@@ -130,10 +186,7 @@ export class PaymentsService {
       where: { skuId: sku.id, deactivatedAt: null },
     });
     if (existing) {
-      const link = await this.stripe.paymentLinks.retrieve(
-        existing.stripePaymentLinkId,
-      );
-      return link.url;
+      return this.retrievePaymentLinkUrl(existing.stripePaymentLinkId);
     }
 
     const currency = STORE_CURRENCY.toLowerCase();
@@ -157,15 +210,39 @@ export class PaymentsService {
       ],
     });
 
-    await this.prisma.paymentLink.create({
-      data: {
-        skuId: sku.id,
-        stripePaymentLinkId: paymentLink.id,
-        stripePriceId: price.id,
-        unitAmount: sku.price,
-      },
-    });
+    try {
+      await this.prisma.paymentLink.create({
+        data: {
+          skuId: sku.id,
+          stripePaymentLinkId: paymentLink.id,
+          stripePriceId: price.id,
+          unitAmount: sku.price,
+        },
+      });
+      return paymentLink.url;
+    } catch (error) {
+      if (
+        uniqueConstraintIndexName(error) !== 'payment_links_sku_id_active_key'
+      ) {
+        throw error;
+      }
+      // Lost the race to a concurrent first-time creation for this sku —
+      // deactivate this now-redundant link and hand back the winner's
+      // instead (decisions.md).
+      await this.stripe.paymentLinks
+        .update(paymentLink.id, { active: false })
+        .catch(() => {});
+      const winner = await this.prisma.paymentLink.findFirstOrThrow({
+        where: { skuId: sku.id, deactivatedAt: null },
+      });
+      return this.retrievePaymentLinkUrl(winner.stripePaymentLinkId);
+    }
+  }
 
-    return paymentLink.url;
+  private async retrievePaymentLinkUrl(
+    stripePaymentLinkId: string,
+  ): Promise<string> {
+    const link = await this.stripe.paymentLinks.retrieve(stripePaymentLinkId);
+    return link.url;
   }
 }

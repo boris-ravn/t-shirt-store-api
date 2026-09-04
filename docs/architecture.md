@@ -18,7 +18,7 @@ A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with varian
 | Framework | NestJS |
 | Database | PostgreSQL via Prisma (`@prisma/adapter-pg` driver adapter) — pinned to `7.10.0`, see `decisions.md` before bumping |
 | Validation | `class-validator`/`class-transformer` behind a global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`) |
-| Docs | Hand-written OpenAPI in `docs/api/` (authoritative) + generated Swagger at `/docs`, reconciled with `oasdiff` |
+| Docs | Hand-written OpenAPI in `docs/api/` (authoritative) + generated Swagger at `/docs`, reconciled by eye each slice (`decisions.md`) |
 | Auth | Passport + JWT (access + refresh), CASL for authorization |
 | Storage | S3-compatible (`@aws-sdk/client-s3`); MinIO locally via `docker-compose.yml`, real AWS in prod (branches on `AWS_S3_ENDPOINT`) |
 | Mail | `nodemailer` → local Mailhog in dev |

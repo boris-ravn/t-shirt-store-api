@@ -24,7 +24,7 @@ Spectral enforces this project's own rules (every operation has a summary, every
 
 ### 2026-08-21 — The generated Swagger spec is reconciled against the hand-written one, never allowed to replace it
 
-`@nestjs/swagger` produces a second OpenAPI document from decorators; `docs/api/` stays authoritative, and the generated document is diffed against it with `oasdiff` — a difference is treated as a bug in the implementation until argued otherwise. Letting the generated file become the truth would turn every accidental decorator detail into a silent contract change.
+`@nestjs/swagger` produces a second OpenAPI document from decorators; `docs/api/` stays authoritative, and the generated document is checked by eye against it each slice — a difference is treated as a bug in the implementation until argued otherwise. Letting the generated file become the truth would turn every accidental decorator detail into a silent contract change. This reconciliation is manual, not an automated or re-runnable check: `oasdiff` (the tool that would do it) has no working npm distribution and this environment has no Go toolchain to build it from source.
 
 ### 2026-08-21 — One error catalog: RFC 9457 body, a 403-versus-404 rule, and a fixed problem-type registry
 

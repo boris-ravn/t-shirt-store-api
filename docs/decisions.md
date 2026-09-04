@@ -109,3 +109,15 @@ The general lesson: any read used both to decide *what* to write and to compute 
 ### 2026-08-28 — Password-change email is synchronous; BullMQ arrives with the stock-notification job
 
 `MailService` (nodemailer → local Mailhog) is called directly and awaited — no queue in front of it. BullMQ/Redis is deferred to the feature that actually needs asynchronous, retryable delivery (stock notifications); a single non-critical email didn't justify standing up the infra early.
+
+### 2026-09-04 — Fulfil needs no raw-SQL guard, unlike Reserve and Direct sale
+
+The 2026-09-03 entry on guarded `updateMany` calls predicted Fulfil would need the same `$executeRaw` treatment as Reserve. It doesn't: Fulfil only runs once Reserve has already verified availability at cart-checkout time, so there is no "compare two columns of the same row" condition left to guard — it's an unconditional `stock -= qty, reservedStock -= qty`, expressible as a plain Prisma `update`. `$executeRaw` stays reserved for Reserve and Direct sale, the two transitions that actually gate on `stock - reserved_stock >= qty`.
+
+### 2026-09-04 — Payment Link checkout trusts the webhook's real quantity, not the request that started it
+
+`payment_links` has no `quantity` column (`erd.dbml` — one reusable link per SKU, just `unit_amount`), but `POST /v1/checkout/payment-link` takes a `quantity` from the client. Checked against the installed Stripe SDK's own types (not assumed): a Payment Link's line item has one fixed `quantity` — reusing the same link across different buyers who want different amounts requires enabling `adjustable_quantity`, which means a buyer can change the quantity on Stripe's hosted page after our `pending` order was already created with the originally-requested one.
+
+Rejected alternative: disable `adjustable_quantity` and key PaymentLink reuse on `(skuId, quantity)` instead of `skuId` alone, so each distinct quantity gets its own link. Dropped because it contradicts the ERD's own one-link-per-SKU shape and would multiply Stripe objects for no real benefit.
+
+Fix: `adjustable_quantity` stays enabled, and `checkout.session.completed`'s handler calls `stripe.checkout.sessions.listLineItems` (the webhook payload itself never carries the real purchased quantity) and overwrites the order's `order_item.quantity`, `subtotal`, and `total` from that response before running the Direct-sale guard — the webhook is the only authoritative source once adjustable quantity is in play, not the request that created the order.

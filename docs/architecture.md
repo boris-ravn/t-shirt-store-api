@@ -23,7 +23,8 @@ A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with varian
 | Storage | S3-compatible (`@aws-sdk/client-s3`); MinIO locally via `docker-compose.yml`, real AWS in prod (branches on `AWS_S3_ENDPOINT`) |
 | Mail | `nodemailer` → local Mailhog in dev |
 | Testing | Jest (unit), Supertest + Testcontainers (e2e, real Postgres) |
-| Not yet added | Stripe SDK, BullMQ + Redis — land with payments/notifications |
+| Payments | Stripe SDK (`stripe`, pinned `22.6.1`), test mode only |
+| Not yet added | BullMQ + Redis — lands with notifications |
 
 ## Layering
 
@@ -38,7 +39,7 @@ Every 4xx/5xx returns the same RFC 9457 `application/problem+json` shape (`Probl
 - **Authentication**: JWT access token (short-lived, role embedded, not re-read from the DB per request — see `decisions.md`) + opaque refresh token (sha256-hashed, rotated on use, revocable). `JwtAuthGuard`/`OptionalJwtAuthGuard` applied explicitly per route via `@UseGuards()` — no global guard.
 - **Roles**: `manager`, `client`, `delivery_person` (`UserRole` enum). Role never comes from a request body.
 - **Authorization**: CASL, one `CaslAbilityFactory` (`src/casl/`) building an `AppAbility` per request from the authenticated user's role. `@CheckPolicies(...)` + `PoliciesGuard`, applied **per-method, never at the controller class level** (see `decisions.md` — a real bug shipped from getting this wrong once).
-- Current `AppSubject` union covers `Category | Product | Sku | Cart | Like | PromoCode | Order`. `Cart` and `Like` are client-only: neither `manager` nor `delivery_person` gets any ability on either, not even read (see `decisions.md`). `PromoCode` splits differently — manager gets `manage`, client gets a custom `apply` action (validate-only, not full CRUD); CASL's `manage` matches any action by default, so the manager grant needs an explicit `cannot('apply', ...)` carve-out (see `decisions.md` — a real gap found by testing, not obvious from the code). `Order` has one custom action per transition endpoint (`cancel`/`process`/`ship`/`deliver`, plus `create`/`read`) rather than `manage`, deliberately avoiding that same wildcard trap; `delivery_person`'s `read` is service-scoped to `shipped` orders plus their own `delivered` ones, per `database/README.md` §5's flagged note.
+- Current `AppSubject` union covers `Category | Product | Sku | Cart | Like | PromoCode | Order`. `Cart` and `Like` are client-only: neither `manager` nor `delivery_person` gets any ability on either, not even read (see `decisions.md`). `PromoCode` splits differently — manager gets `manage`, client gets a custom `apply` action (validate-only, not full CRUD); CASL's `manage` matches any action by default, so the manager grant needs an explicit `cannot('apply', ...)` carve-out (see `decisions.md` — a real gap found by testing, not obvious from the code). `Order` has one custom action per transition endpoint (`cancel`/`process`/`ship`/`deliver`, plus `create`/`read`) rather than `manage`, deliberately avoiding that same wildcard trap; `delivery_person`'s `read` is service-scoped to `shipped` orders plus their own `delivered` ones, per `database/README.md` §5's flagged note. `payments` introduces no new subject — both checkout-creation endpoints reuse `Order`'s `create` ability, since creating a payment is the continuation of checkout; per-order ownership stays a service-layer 404. The `/v1/webhooks/stripe` route carries no guard at all — Stripe isn't a CASL-scoped actor, and the `Stripe-Signature` header is its authentication.
 
 ## Data layer
 
@@ -51,7 +52,7 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 ## Testing strategy
 
 - **Unit** (`*.service.spec.ts`): mock `PrismaService`, assert on branch logic (which exception fires, which fields get written, role-based visibility). Standard NestJS testing-module pattern.
-- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out); order history (role-scoped listing, filters, pagination, ownership 404), seeding orders directly via Prisma rather than through checkout since a real `paid` order needs Slice 5's payment webhook; and checkout (cart → pending order reservation, cancel-from-pending release, and a concurrent-double-checkout regression test — real Postgres is what makes that last one meaningful, a mocked-Prisma unit test can't exercise real transaction concurrency). The `pending → paid` leg (cart → order → payment → `paid`) lands with Slice 5.
+- **E2E** (`test/*.e2e-spec.ts`): real Postgres via Testcontainers, `createNestApplication()` + `app.init()`, asserting both the HTTP response and persisted state. Covers the auth flow (sign-up → sign-in → refresh → sign-out); order history (role-scoped listing, filters, pagination, ownership 404), seeding orders directly via Prisma rather than through checkout since exercising every status doesn't need a real payment; and checkout (cart → pending order reservation, cancel-from-pending release, a concurrent-double-checkout regression test, and the `payment_intent.succeeded` webhook's Fulfil path — signature-verified for real via `Stripe.webhooks.generateTestHeaderString`/`constructEvent` against the app's own configured secret, not the Stripe CLI, so it needs no live network call or real Stripe key to run). The two live-Stripe-API tests (real `createPaymentIntent`/`createPaymentLinkCheckout` calls) run only when a real `STRIPE_SECRET_KEY` is present in `.env`; they skip cleanly otherwise (`decisions.md`).
 - Root `CLAUDE.md`'s rule: don't write assertions for code written in the same session: offer the mocking setup, let the reasoning happen in review.
 
 ## Module map
@@ -67,8 +68,8 @@ Prisma schema is modeled incrementally — only the tables the current feature t
 | `cart` | Done | cart + cart items, SKU-scoped, live pricing (client-only) |
 | `likes` | Done | product likes (client-only) — feeds the notification recipient list |
 | `promos` | Done | promo code CRUD (manager) + validation against the caller's cart (client). Redemption itself (`times_redeemed` reserve/release) lands with `orders` |
-| `orders` | Done | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock. `paid` itself is only reachable via direct DB write until Slice 5's payment webhook lands |
-| `payments` | Pending | Stripe Payment Intent (cart) + Payment Link (single-SKU), webhook handling, stock Fulfil/Direct-sale |
+| `orders` | Done | checkout, status lifecycle (`pending→paid→processing→shipped→delivered`, branch to `cancelled`), status history, stock Reserve/Release/Restock |
+| `payments` | Done | Stripe Payment Intent (cart) + Payment Link (single-SKU) creation, `/v1/webhooks/stripe`, stock Fulfil/Direct-sale, `order_shipping_details` |
 | `notifications` | Pending | low-stock detection, BullMQ-backed email fan-out to likers who haven't bought |
 | Stale-pending sweep | Pending | periodic job cancelling abandoned `pending` orders (releases stock + promo reservations) |
 
@@ -76,7 +77,7 @@ Stock mechanics (five guarded transitions: Reserve, Fulfil, Release, Restock, Di
 
 ## Config surface
 
-Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`) — a missing var fails startup, not the first request that needs it. Current variables: see `.env.example` (DB connection, JWT secrets/expiry, SMTP, AWS/S3, throttle limits). Stripe and Redis vars will be added when those features land.
+Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`) — a missing var fails startup, not the first request that needs it. Current variables: see `.env.example` (DB connection, JWT secrets/expiry, SMTP, AWS/S3, throttle limits, Stripe secret + webhook signing key). Redis vars will be added when notifications land.
 
 ## Local infrastructure
 

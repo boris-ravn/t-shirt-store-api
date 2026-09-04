@@ -80,6 +80,14 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   THROTTLE_LIMIT!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  STRIPE_SECRET_KEY!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  STRIPE_WEBHOOK_SECRET!: string;
 }
 
 // Wired into ConfigModule.forRoot({ validate }) in app.module.ts — runs once

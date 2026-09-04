@@ -40,4 +40,20 @@ export class MailService {
     });
     this.logger.log(`Password-changed email sent to ${to}`);
   }
+
+  async sendLowStockNotification(
+    to: string,
+    firstName: string,
+    productName: string,
+    imageUrl: string | undefined,
+  ): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: `${productName} is almost sold out`,
+      text: `Hi ${firstName},\n\n${productName} is almost sold out — grab it before it's gone.`,
+      html: `<p>Hi ${firstName},</p><p>${productName} is almost sold out — grab it before it's gone.</p>${imageUrl ? `<img src="${imageUrl}" alt="${productName}">` : ''}`,
+    });
+    this.logger.log(`Low-stock notification sent to ${to}`);
+  }
 }

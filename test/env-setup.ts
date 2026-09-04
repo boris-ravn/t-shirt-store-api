@@ -1,3 +1,10 @@
+import { config } from 'dotenv';
+
+// Loaded first so a real .env's Stripe keys survive the `??=` defaults
+// below — dotenv never overrides an already-set process.env var, and every
+// other var here is set unconditionally, so this can't leak a real secret.
+config();
+
 // Runs before any e2e spec file is required — critically, before
 // `../src/app.module`'s `@Module()` decorator evaluates ConfigModule.forRoot(),
 // which calls env.validation.ts's validate() at import time, not at
@@ -25,3 +32,8 @@ process.env.AWS_ACCESS_KEY_ID = 'unused';
 process.env.AWS_SECRET_ACCESS_KEY = 'unused';
 process.env.THROTTLE_TTL = '60';
 process.env.THROTTLE_LIMIT = '1000';
+
+// Left as-is if already exported (a real Stripe test-mode key); defaulted
+// only so specs that never touch Stripe still pass env validation at boot.
+process.env.STRIPE_SECRET_KEY ??= 'sk_test_e2e_placeholder';
+process.env.STRIPE_WEBHOOK_SECRET ??= 'whsec_e2e_placeholder';

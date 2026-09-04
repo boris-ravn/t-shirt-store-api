@@ -140,9 +140,10 @@ model Sku {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  product    Product     @relation(fields: [productId], references: [id])
-  cartItems  CartItem[]
-  orderItems OrderItem[]
+  product      Product       @relation(fields: [productId], references: [id])
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  paymentLinks PaymentLink[]
 
   @@unique([productId, size, color])
   @@index([productId])
@@ -255,6 +256,7 @@ model Order {
   items           OrderItem[]
   shippingDetails OrderShippingDetails?
   statusHistory   OrderStatusHistory[]
+  payments        Payment[]
 
   @@index([userId, createdAt])
   @@index([userId, status, createdAt])
@@ -316,4 +318,76 @@ model OrderStatusHistory {
   @@index([orderId, createdAt])
   @@index([changedBy, status, createdAt])
   @@map("order_status_history")
+}
+
+// ---------------------------------------------------------------- payments
+
+enum PaymentMethod {
+  payment_link
+  payment_intent
+
+  @@map("payment_method")
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+
+  @@map("payment_status")
+}
+
+// No @unique on skuId — a partial index (WHERE deactivated_at IS NULL) in
+// the migration guards it instead (decisions.md).
+model PaymentLink {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skuId               String    @map("sku_id") @db.Uuid
+  stripePaymentLinkId String    @unique @map("stripe_payment_link_id")
+  stripePriceId       String    @map("stripe_price_id")
+  unitAmount          Int       @map("unit_amount")
+  deactivatedAt       DateTime? @map("deactivated_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  sku      Sku       @relation(fields: [skuId], references: [id])
+  payments Payment[]
+
+  @@index([skuId])
+  @@map("payment_links")
+}
+
+// No @unique on orderId — two partial indexes in the migration (WHERE
+// status = 'succeeded' / 'pending') guard it instead; Prisma's DSL can't
+// express them (README §9, decisions.md).
+// method <-> Stripe-column pairing is enforced by construction, not a
+// CHECK: each writer only ever sets the columns for its own method.
+model Payment {
+  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                 String        @map("order_id") @db.Uuid
+  method                  PaymentMethod
+  paymentLinkId           String?       @map("payment_link_id") @db.Uuid
+  stripeCheckoutSessionId String?       @unique @map("stripe_checkout_session_id")
+  stripePaymentIntentId   String?       @unique @map("stripe_payment_intent_id")
+  stripeRefundId          String?       @map("stripe_refund_id")
+  amount                  Int
+  currency                String        @default("usd") @db.Char(3)
+  status                  PaymentStatus @default(pending)
+  createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order       Order        @relation(fields: [orderId], references: [id])
+  paymentLink PaymentLink? @relation(fields: [paymentLinkId], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model StripeWebhookEvent {
+  id          String    @id @db.VarChar
+  type        String
+  payload     Json
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("stripe_webhook_events")
 }

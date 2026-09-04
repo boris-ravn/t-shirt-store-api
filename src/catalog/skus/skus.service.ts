@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { LowStockService } from '../../notifications/low-stock.service';
 import {
   isUniqueConstraintViolation,
   uniqueConstraintIndexName,
@@ -13,7 +14,10 @@ import { SkuReservedException } from './exceptions/sku-reserved.exception';
 
 @Injectable()
 export class SkusService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly lowStockService: LowStockService,
+  ) {}
 
   async create(dto: CreateSkuRequestDto): Promise<SkuAdminResponseDto> {
     await this.assertProductExists(dto.productId);
@@ -83,6 +87,11 @@ export class SkusService {
       where: { id },
       data: { stock: { increment: dto.quantity } },
     });
+    await this.lowStockService.resolveIfCrossedAbove(
+      this.prisma,
+      sku.productId,
+      sku.stock,
+    );
 
     return SkuAdminResponseDto.fromEntity(sku);
   }

@@ -9,6 +9,7 @@ import { AuthenticatedUser } from '../common/types/authenticated-user.interface'
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { Prisma } from '../generated/prisma/client';
 import { OrderStatus, UserRole } from '../generated/prisma/enums';
+import { LowStockService } from '../notifications/low-stock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeExhaustedException } from '../promos/exceptions/promo-code-exhausted.exception';
 import { PromoCodeExpiredException } from '../promos/exceptions/promo-code-expired.exception';
@@ -71,6 +72,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
+    private readonly lowStockService: LowStockService,
   ) {}
 
   async createOrder(
@@ -313,12 +315,19 @@ export class OrdersService {
       select: { skuId: true, quantity: true },
     });
     for (const item of items) {
-      await tx.sku.update({
+      const updated = await tx.sku.update({
         where: { id: item.skuId },
         data: isRestock
           ? { stock: { increment: item.quantity } }
           : { reservedStock: { decrement: item.quantity } },
       });
+      if (isRestock) {
+        await this.lowStockService.resolveIfCrossedAbove(
+          tx,
+          updated.productId,
+          updated.stock,
+        );
+      }
     }
 
     const cancelled = await tx.order.findUniqueOrThrow({

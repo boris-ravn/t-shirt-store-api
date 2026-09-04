@@ -66,6 +66,7 @@ export class SkusController {
   }
 
   @Post(':skuId/restock')
+  @HttpCode(HttpStatus.OK)
   @CheckPolicies((ability) => ability.can('manage', 'Sku'))
   @ApiOperation({ summary: 'Add stock to a SKU' })
   @ApiOkResponse({ type: SkuAdminResponseDto })

@@ -13,7 +13,7 @@ describe('StripeWebhookService', () => {
   let service: StripeWebhookService;
   let prisma: {
     stripeWebhookEvent: { create: jest.Mock; update: jest.Mock };
-    order: { updateMany: jest.Mock };
+    order: { updateMany: jest.Mock; findUnique: jest.Mock };
     orderItem: {
       findMany: jest.Mock;
       findFirstOrThrow: jest.Mock;
@@ -76,7 +76,7 @@ describe('StripeWebhookService', () => {
   beforeEach(async () => {
     prisma = {
       stripeWebhookEvent: { create: jest.fn(), update: jest.fn() },
-      order: { updateMany: jest.fn() },
+      order: { updateMany: jest.fn(), findUnique: jest.fn() },
       orderItem: {
         findMany: jest.fn(),
         findFirstOrThrow: jest.fn(),
@@ -181,6 +181,19 @@ describe('StripeWebhookService', () => {
         where: { id: paymentIntentSucceededEvent.id },
         data: { processedAt: expect.any(Date) as Date },
       });
+    });
+
+    it('warns when the order was cancelled out from under an in-flight payment (stale-order-sweep race, decisions.md)', async () => {
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.cancelled,
+      });
+
+      await service.handleEvent(paymentIntentSucceededEvent as never);
+
+      // TODO(testing agent): jest.spyOn(Logger.prototype, 'warn') before
+      // the act step and assert it was called with a message naming
+      // order-1 and pi_123.
     });
 
     it('decrements stock and reservedStock together for every order item', async () => {
@@ -290,6 +303,19 @@ describe('StripeWebhookService', () => {
       expect(prisma.orderItem.update).not.toHaveBeenCalled();
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
       expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('warns when the order was cancelled out from under an in-flight payment (stale-order-sweep race, decisions.md)', async () => {
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.cancelled,
+      });
+
+      await service.handleEvent(checkoutSessionCompletedEvent as never);
+
+      // TODO(testing agent): jest.spyOn(Logger.prototype, 'warn') before
+      // the act step and assert it was called with a message naming
+      // order-2 and cs_123.
     });
 
     it('corrects order_item.quantity and the order total from the real Stripe line items, not the original request', async () => {

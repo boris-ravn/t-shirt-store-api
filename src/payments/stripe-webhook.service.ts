@@ -99,6 +99,7 @@ export class StripeWebhookService {
         data: { status: OrderStatus.paid },
       });
       if (claimed.count === 0) {
+        await this.warnIfCancelledUnderPayment(tx, orderId, intent.id);
         return;
       }
 
@@ -166,6 +167,7 @@ export class StripeWebhookService {
         },
       });
       if (claimed.count === 0) {
+        await this.warnIfCancelledUnderPayment(tx, orderId, session.id);
         return;
       }
 
@@ -239,5 +241,25 @@ export class StripeWebhookService {
         country: info.address.country ?? '',
       },
     });
+  }
+
+  // Distinguishes a genuinely dangerous race (the stale-order sweep
+  // cancelled this order while a payment was in flight — money changed
+  // hands and nothing recorded it, decisions.md) from the harmless
+  // already-paid case a duplicate webhook delivery produces.
+  private async warnIfCancelledUnderPayment(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    stripeReference: string,
+  ): Promise<void> {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+    if (order?.status === OrderStatus.cancelled) {
+      this.logger.warn(
+        `Order ${orderId} was already cancelled when ${stripeReference} succeeded — Stripe charged the customer but no stock, payment, or shipping record was written. Needs manual reconciliation.`,
+      );
+    }
   }
 }

@@ -13,6 +13,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 import { PaymentMethod, PaymentStatus } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { STRIPE_CLIENT } from '../src/stripe/stripe.constants';
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 // Set only when a developer has added a real Stripe test-mode key to .env
@@ -323,6 +324,104 @@ describe('Checkout (e2e)', () => {
         where: { id: skuId },
       });
       expect(skuAfterReplay.stock).toBe(8);
+    });
+  });
+
+  // Real Postgres, but the Stripe client is stubbed for this describe block
+  // specifically — the point is proving the DB-level race guard, not
+  // exercising the real Stripe API (that's "Live Stripe API" below). Mirrors
+  // the createOrder cart-claim regression test's approach: a second app
+  // bound to the same container, one provider overridden.
+  describe('Payment intent creation — concurrency', () => {
+    let stubbedApp: INestApplication;
+    let stripeStub: {
+      paymentIntents: {
+        create: jest.Mock;
+        cancel: jest.Mock;
+        retrieve: jest.Mock;
+      };
+    };
+
+    beforeAll(async () => {
+      stripeStub = {
+        paymentIntents: {
+          create: jest.fn(),
+          cancel: jest.fn().mockResolvedValue({}),
+          retrieve: jest.fn(),
+        },
+      };
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [AppModule],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .overrideProvider(STRIPE_CLIENT)
+        .useValue(stripeStub)
+        .compile();
+      stubbedApp = moduleRef.createNestApplication({ rawBody: true });
+      configureApp(stubbedApp);
+      await stubbedApp.init();
+    });
+
+    afterAll(async () => {
+      await stubbedApp.close();
+    });
+
+    it('creates exactly one usable payment intent when the same order is requested concurrently', async () => {
+      const { token } = await createClientWithCart(1);
+      const created = await request(app.getHttpServer())
+        .post('/v1/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      const orderId = (created.body as OrderBody).id;
+
+      let createCalls = 0;
+      stripeStub.paymentIntents.create.mockImplementation(() => {
+        createCalls += 1;
+        return Promise.resolve({
+          id: `pi_race_${createCalls}`,
+          client_secret: `pi_race_${createCalls}_secret`,
+        });
+      });
+      stripeStub.paymentIntents.retrieve.mockImplementation((id: string) =>
+        Promise.resolve({ client_secret: `${id}_secret` }),
+      );
+
+      const agent = request(stubbedApp.getHttpServer());
+      const [res1, res2] = await Promise.all([
+        agent
+          .post(`/v1/orders/${orderId}/payment-intent`)
+          .set('Authorization', `Bearer ${token}`),
+        agent
+          .post(`/v1/orders/${orderId}/payment-intent`)
+          .set('Authorization', `Bearer ${token}`),
+      ]);
+
+      expect(res1.status).toBe(201);
+      expect(res2.status).toBe(201);
+      const body1 = res1.body as { paymentId: string; clientSecret: string };
+      const body2 = res2.body as { paymentId: string; clientSecret: string };
+      expect(body1.paymentId).toBe(body2.paymentId);
+      expect(body1.clientSecret).toBe(body2.clientSecret);
+
+      // Which defense actually resolves the race is a timing detail, not a
+      // contract: the losing request might lose at the DB unique-constraint
+      // (paymentIntents.create called twice, one cancelled) or might find
+      // the winner's row via the existingPending fast path first
+      // (paymentIntents.create called once). Either is correct — the
+      // invariant that matters is a single surviving Payment row and no
+      // permanently orphaned Stripe intent.
+      if (stripeStub.paymentIntents.create.mock.calls.length === 2) {
+        expect(stripeStub.paymentIntents.cancel).toHaveBeenCalledTimes(1);
+      } else {
+        expect(stripeStub.paymentIntents.cancel).not.toHaveBeenCalled();
+      }
+
+      const payments = await prisma.payment.findMany({
+        where: { orderId, method: PaymentMethod.payment_intent },
+      });
+      expect(payments).toHaveLength(1);
     });
   });
 

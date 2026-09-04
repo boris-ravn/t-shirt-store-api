@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '../generated/prisma/client';
 import {
   OrderStatus,
   PaymentMethod,
@@ -11,19 +12,48 @@ import { STRIPE_CLIENT } from '../stripe/stripe.constants';
 import { OrderNotPayableException } from './exceptions/order-not-payable.exception';
 import { PaymentsService } from './payments.service';
 
+function uniqueConstraintError(indexName: string) {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '7.10.0',
+    meta: {
+      driverAdapterError: { cause: { constraint: { index: indexName } } },
+    },
+  });
+}
+
 describe('PaymentsService', () => {
   let service: PaymentsService;
   let prisma: {
     order: { findUnique: jest.Mock; create: jest.Mock };
-    payment: { findFirst: jest.Mock; create: jest.Mock };
+    payment: {
+      findFirst: jest.Mock;
+      findFirstOrThrow: jest.Mock;
+      create: jest.Mock;
+    };
     sku: { findUnique: jest.Mock };
-    paymentLink: { findFirst: jest.Mock; create: jest.Mock };
+    paymentLink: {
+      findFirst: jest.Mock;
+      findFirstOrThrow: jest.Mock;
+      create: jest.Mock;
+    };
   };
   let stripe: {
-    paymentIntents: { create: jest.Mock };
-    paymentLinks: { create: jest.Mock; retrieve: jest.Mock };
+    paymentIntents: {
+      create: jest.Mock;
+      cancel: jest.Mock;
+      retrieve: jest.Mock;
+    };
+    paymentLinks: { create: jest.Mock; retrieve: jest.Mock; update: jest.Mock };
     prices: { create: jest.Mock };
   };
+
+  const pendingClaimConflict = uniqueConstraintError(
+    'payments_order_id_pending_key',
+  );
+  const activeLinkConflict = uniqueConstraintError(
+    'payment_links_sku_id_active_key',
+  );
 
   const clientUser = { id: 'client-1', role: UserRole.client };
 
@@ -49,13 +79,29 @@ describe('PaymentsService', () => {
   beforeEach(async () => {
     prisma = {
       order: { findUnique: jest.fn(), create: jest.fn() },
-      payment: { findFirst: jest.fn(), create: jest.fn() },
+      payment: {
+        findFirst: jest.fn(),
+        findFirstOrThrow: jest.fn(),
+        create: jest.fn(),
+      },
       sku: { findUnique: jest.fn() },
-      paymentLink: { findFirst: jest.fn(), create: jest.fn() },
+      paymentLink: {
+        findFirst: jest.fn(),
+        findFirstOrThrow: jest.fn(),
+        create: jest.fn(),
+      },
     };
     stripe = {
-      paymentIntents: { create: jest.fn() },
-      paymentLinks: { create: jest.fn(), retrieve: jest.fn() },
+      paymentIntents: {
+        create: jest.fn(),
+        cancel: jest.fn().mockResolvedValue({}),
+        retrieve: jest.fn(),
+      },
+      paymentLinks: {
+        create: jest.fn(),
+        retrieve: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
+      },
       prices: { create: jest.fn() },
     };
     prisma.payment.findFirst.mockResolvedValue(null);
@@ -147,6 +193,65 @@ describe('PaymentsService', () => {
       expect(result).toEqual({
         paymentId: 'payment-1',
         clientSecret: 'pi_123_secret_abc',
+        amount: { amount: 3998, currency: 'USD' },
+      });
+    });
+
+    it('reuses an existing pending payment intent instead of creating a new one', async () => {
+      prisma.order.findUnique.mockResolvedValue(pendingOrder);
+      prisma.payment.findFirst
+        .mockResolvedValueOnce(null) // succeeded-payment check
+        .mockResolvedValueOnce({
+          id: 'payment-1',
+          amount: 3998,
+          stripePaymentIntentId: 'pi_existing',
+        }); // existing-pending check
+      stripe.paymentIntents.retrieve.mockResolvedValue({
+        client_secret: 'pi_existing_secret',
+      });
+
+      const result = await service.createPaymentIntent(
+        clientUser,
+        pendingOrder.id,
+      );
+
+      expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith(
+        'pi_existing',
+      );
+      expect(stripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        paymentId: 'payment-1',
+        clientSecret: 'pi_existing_secret',
+        amount: { amount: 3998, currency: 'USD' },
+      });
+    });
+
+    it('cancels the redundant intent and reuses the winner when a concurrent request already claimed the order', async () => {
+      prisma.order.findUnique.mockResolvedValue(pendingOrder);
+      stripe.paymentIntents.create.mockResolvedValue({
+        id: 'pi_loser',
+        client_secret: 'pi_loser_secret',
+      });
+      prisma.payment.create.mockRejectedValue(pendingClaimConflict);
+      prisma.payment.findFirstOrThrow.mockResolvedValue({
+        id: 'payment-winner',
+        amount: 3998,
+        stripePaymentIntentId: 'pi_winner',
+      });
+      stripe.paymentIntents.retrieve.mockResolvedValue({
+        client_secret: 'pi_winner_secret',
+      });
+
+      const result = await service.createPaymentIntent(
+        clientUser,
+        pendingOrder.id,
+      );
+
+      expect(stripe.paymentIntents.cancel).toHaveBeenCalledWith('pi_loser');
+      expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith('pi_winner');
+      expect(result).toEqual({
+        paymentId: 'payment-winner',
+        clientSecret: 'pi_winner_secret',
         amount: { amount: 3998, currency: 'USD' },
       });
     });
@@ -303,6 +408,38 @@ describe('PaymentsService', () => {
           unitAmount: skuEntity.price,
         },
       });
+    });
+
+    it('deactivates the redundant link and reuses the winner when a concurrent first-time creation already claimed the sku', async () => {
+      prisma.sku.findUnique.mockResolvedValue(skuEntity);
+      prisma.paymentLink.findFirst.mockResolvedValue(null);
+      stripe.prices.create.mockResolvedValue({ id: 'price_loser' });
+      stripe.paymentLinks.create.mockResolvedValue({
+        id: 'plink_loser',
+        url: 'https://buy.stripe.com/test_loser',
+      });
+      prisma.paymentLink.create.mockRejectedValue(activeLinkConflict);
+      prisma.paymentLink.findFirstOrThrow.mockResolvedValue({
+        stripePaymentLinkId: 'plink_winner',
+      });
+      stripe.paymentLinks.retrieve.mockResolvedValue({
+        url: 'https://buy.stripe.com/test_winner',
+      });
+      prisma.order.create.mockResolvedValue({
+        id: 'order-2',
+        items: [],
+        shippingDetails: null,
+      });
+
+      const result = await service.createPaymentLinkCheckout(clientUser, dto);
+
+      expect(stripe.paymentLinks.update).toHaveBeenCalledWith('plink_loser', {
+        active: false,
+      });
+      expect(stripe.paymentLinks.retrieve).toHaveBeenCalledWith('plink_winner');
+      expect(result.checkoutUrl).toBe(
+        'https://buy.stripe.com/test_winner?client_reference_id=order-2',
+      );
     });
   });
 });

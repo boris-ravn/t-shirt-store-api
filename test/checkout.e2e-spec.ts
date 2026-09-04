@@ -40,6 +40,7 @@ interface AuthSessionBody {
 interface OrderBody {
   id: string;
   status: string;
+  paymentMethod: string | null;
 }
 
 describe('Checkout (e2e)', () => {
@@ -247,6 +248,13 @@ describe('Checkout (e2e)', () => {
         where: { stripePaymentIntentId },
       });
       expect(payment.status).toBe('succeeded');
+
+      const paidOrderResponse = await request(app.getHttpServer())
+        .get(`/v1/orders/${orderId}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect((paidOrderResponse.body as OrderBody).paymentMethod).toBe(
+        'payment_intent',
+      );
 
       const shipping = await prisma.orderShippingDetails.findUniqueOrThrow({
         where: { orderId },

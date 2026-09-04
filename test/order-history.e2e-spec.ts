@@ -3,7 +3,11 @@ import { Server } from 'node:http';
 import { INestApplication } from '@nestjs/common';
 import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
-import { OrderStatus } from '../src/generated/prisma/enums';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { bootstrapE2eApp, teardownE2eApp } from './support/e2e-app';
 import { signUpPayload } from './support/fixtures';
@@ -19,6 +23,8 @@ interface OrderBody {
   id: string;
   status: string;
   total: { amount: number; currency: string };
+  paymentMethod: string | null;
+  promoCode: { id: string; code: string } | null;
 }
 
 interface OrderListBody {
@@ -42,6 +48,10 @@ describe('Order history (e2e)', () => {
   let clientBId: string;
   let skuId: string;
   let productId: string;
+  let paidOrderId: string;
+  let pendingOrderId: string;
+  let promoCodeId: string;
+  let promoCodeCode: string;
 
   beforeAll(async () => {
     ({ app, prisma, container } = await bootstrapE2eApp());
@@ -80,19 +90,37 @@ describe('Order history (e2e)', () => {
     });
     skuId = sku.id;
 
+    const promoCode = await prisma.promoCode.create({
+      data: {
+        code: `E2E15-${randomUUID()}`,
+        discountType: 'fixed_amount',
+        discountValue: 200,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        usageLimit: 100,
+        createdBy: clientAId,
+      },
+    });
+    promoCodeId = promoCode.id;
+    promoCodeCode = promoCode.code;
+
     // One order per (status, total, createdAt) combination the filter
     // tests need — created directly via Prisma, not the checkout endpoint.
-    await seedOrder({
+    // The pending order is left with no payment/promo code (still unpaid,
+    // so paymentMethod/promoCode must read back as null); the paid order
+    // gets both, so at least one listed order exercises the non-null case.
+    pendingOrderId = await seedOrder({
       userId: clientAId,
       status: OrderStatus.pending,
       total: 1000,
       daysAgo: 10,
     });
-    await seedOrder({
+    paidOrderId = await seedOrder({
       userId: clientAId,
       status: OrderStatus.paid,
       total: 2000,
       daysAgo: 5,
+      promoCodeId,
+      withSucceededPayment: true,
     });
     await seedOrder({
       userId: clientAId,
@@ -112,15 +140,18 @@ describe('Order history (e2e)', () => {
       status: OrderStatus;
       total: number;
       daysAgo: number;
-    }) {
+      promoCodeId?: string;
+      withSucceededPayment?: boolean;
+    }): Promise<string> {
       const createdAt = new Date(
         Date.now() - opts.daysAgo * 24 * 60 * 60 * 1000,
       );
-      await prisma.order.create({
+      const order = await prisma.order.create({
         data: {
           userId: opts.userId,
           status: opts.status,
           subtotal: opts.total,
+          promoCodeId: opts.promoCodeId,
           discountAmount: 0,
           total: opts.total,
           createdAt,
@@ -140,6 +171,18 @@ describe('Order history (e2e)', () => {
           },
         },
       });
+      if (opts.withSucceededPayment) {
+        await prisma.payment.create({
+          data: {
+            orderId: order.id,
+            method: PaymentMethod.payment_intent,
+            stripePaymentIntentId: `pi_e2e_${randomUUID()}`,
+            amount: opts.total,
+            status: PaymentStatus.succeeded,
+          },
+        });
+      }
+      return order.id;
     }
   });
 
@@ -165,6 +208,17 @@ describe('Order history (e2e)', () => {
 
     const totals = body.data.map((order) => order.total.amount);
     expect(totals).toEqual([3000, 2000, 1000]);
+
+    const paidOrder = body.data.find((order) => order.id === paidOrderId);
+    expect(paidOrder?.paymentMethod).toBe('payment_intent');
+    expect(paidOrder?.promoCode).toEqual({
+      id: promoCodeId,
+      code: promoCodeCode,
+    });
+
+    const pendingOrder = body.data.find((order) => order.id === pendingOrderId);
+    expect(pendingOrder?.paymentMethod).toBeNull();
+    expect(pendingOrder?.promoCode).toBeNull();
   });
 
   it('filters by status', async () => {

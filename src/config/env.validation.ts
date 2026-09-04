@@ -88,6 +88,10 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   STRIPE_WEBHOOK_SECRET!: string;
+
+  @IsInt()
+  @Min(1)
+  STALE_ORDER_MAX_AGE_MINUTES!: number;
 }
 
 // Wired into ConfigModule.forRoot({ validate }) in app.module.ts — runs once

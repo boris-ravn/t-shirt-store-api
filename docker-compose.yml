@@ -23,6 +23,17 @@ services:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # S3-compatible local target for product image uploads — there's no real
   # AWS account for this training project. See AWS_S3_ENDPOINT in
   # .env.example; unset it (or point it at nothing) to use real AWS instead.

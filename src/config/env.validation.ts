@@ -92,6 +92,15 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   STALE_ORDER_MAX_AGE_MINUTES!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  REDIS_HOST!: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  REDIS_PORT!: number;
 }
 
 // Wired into ConfigModule.forRoot({ validate }) in app.module.ts — runs once

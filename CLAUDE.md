@@ -15,11 +15,11 @@ If the code and one of those disagree, that is a bug in one of them. Name which 
 
 ---
 
-## Current state (2026-09-04)
+## Current state (2026-09-06)
 
 All 8 implementation slices are done and merged to `main`: cart, likes, promo codes, orders, payments (Stripe, both flows), the stale-pending order sweep, and stock notifications (BullMQ + Redis). The module map, stack, and what's genuinely still open are in [`docs/architecture.md`](docs/architecture.md) — that file is the current-state source of truth, not this one; it gets updated inside the same slice as the code, this section only needs a bump when the overall phase changes (design → implementation → done).
 
-No CI pipeline exists (`.github/workflows` was never created) — an explicit, recorded deferral (`decisions.md`), not an oversight.
+CI runs on GitHub Actions (`.github/workflows/ci.yml`): a `checks` job (lint, build, unit tests, `lint:openapi`) gates an `e2e` job (Testcontainers Postgres, Redis/Mailhog as service containers) — see `decisions.md` for what it does and doesn't stand up, and why.
 
 ---
 

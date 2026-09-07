@@ -23,7 +23,7 @@ All slices are implemented and merged to `main`. See [`docs/architecture.md`](do
 | Async | BullMQ on Redis (stock notifications), `@nestjs/schedule` (stale-order sweep) |
 | Payments | Stripe (test mode only) |
 | Testing | Jest, Supertest, Testcontainers |
-| CI | Not built — see [`docs/decisions.md`](docs/decisions.md) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) |
 
 ---
 

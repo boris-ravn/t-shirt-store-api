@@ -83,3 +83,5 @@ Read through `@nestjs/config`, validated at boot (`src/config/env.validation.ts`
 ## Local infrastructure
 
 `docker-compose.yml`: Postgres, Mailhog (SMTP catcher, UI at `:8025`), Redis (for BullMQ), MinIO (S3-compatible, console at `:9001`).
+
+CI (`.github/workflows/ci.yml`) mirrors only Redis and Mailhog as GitHub Actions `services:` — Postgres is provisioned per e2e run by Testcontainers instead, and MinIO isn't stood up at all since no e2e spec touches S3 today.

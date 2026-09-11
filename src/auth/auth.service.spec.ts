@@ -308,6 +308,28 @@ describe('AuthService', () => {
         'raw-reset-token',
       );
     });
+
+    it('still resolves when sendPasswordResetEmail rejects, so an existing account is indistinguishable from an unknown one', async () => {
+      prisma.user.findUnique.mockResolvedValue(existingUser);
+      passwordResetTokenService.issue.mockResolvedValue('raw-reset-token');
+      mailService.sendPasswordResetEmail.mockRejectedValue(
+        new Error('SMTP unreachable'),
+      );
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+
+      await expect(
+        service.forgotPassword({ email: existingUser.email }),
+      ).resolves.toBeUndefined();
+
+      expect(passwordResetTokenService.issue).toHaveBeenCalledWith(
+        existingUser.id,
+      );
+      expect(errorSpy).toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+    });
   });
 
   describe('resetPassword', () => {

@@ -121,11 +121,22 @@ export class AuthService {
     }
 
     const token = await this.passwordResetTokenService.issue(user.id);
-    await this.mailService.sendPasswordResetEmail(
-      user.email,
-      user.firstName,
-      token,
-    );
+    // Must resolve the same way whether delivery succeeds or fails — the
+    // "always resolves" enumeration guarantee above only holds if a mail
+    // failure for an existing account can't produce a different response
+    // than the early return above does for an unknown one.
+    try {
+      await this.mailService.sendPasswordResetEmail(
+        user.email,
+        user.firstName,
+        token,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password-reset email to ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
   }
 
   async resetPassword(dto: ResetPasswordRequestDto): Promise<void> {

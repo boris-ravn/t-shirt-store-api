@@ -21,6 +21,9 @@ const ORDER_INCLUDE = {
   items: true,
   shippingDetails: true,
   promoCode: { select: { id: true, code: true } },
+  // Same reasoning as orders.service.ts's ORDER_INCLUDE: filtered to the
+  // succeeded payment, not the most recent one, so a retry after a failed
+  // attempt reports the payment method that actually went through.
   payments: {
     where: { status: PaymentStatus.succeeded },
     select: { method: true },

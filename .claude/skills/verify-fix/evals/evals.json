@@ -1,0 +1,17 @@
+{
+  "skill_name": "verify-fix",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/verify-fix Verify the fix for the unguarded mail-send in auth.service.ts's forgotPassword and changePassword methods. Show it failing before (or the missing-coverage gap) and passing after.",
+      "expected_output": "A before/after table naming which npm script(s) ran (lint, test at minimum), the real pasted output for each, an honest 'not run' entry for test:e2e if no Docker daemon is available rather than a fabricated pass, and no --no-verify/--fix shortcuts used to force green.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/verify-fix I just changed docs/api/paths/orders.yaml to add a new response field. Confirm the contract is still valid.",
+      "expected_output": "Runs npm run lint:openapi specifically (not the full suite blindly), pastes the real Spectral/Redocly output, and reports PASS/FAIL honestly — correctly scopes down to the relevant check instead of running everything by default.",
+      "files": []
+    }
+  ]
+}

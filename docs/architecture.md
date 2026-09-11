@@ -21,7 +21,7 @@ A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with varian
 | Docs | Hand-written OpenAPI in `docs/api/` (authoritative) + generated Swagger at `/docs`, reconciled by eye each slice (`decisions.md`) |
 | Auth | Passport + JWT (access + refresh), CASL for authorization |
 | Storage | S3-compatible (`@aws-sdk/client-s3`); MinIO locally via `docker-compose.yml`, real AWS in prod (branches on `AWS_S3_ENDPOINT`) |
-| Mail | `nodemailer` → local Mailhog in dev |
+| Mail | `nodemailer` — local Mailhog in dev, authenticated SMTP relay (e.g. Brevo) in prod |
 | Testing | Jest (unit), Supertest + Testcontainers (e2e, real Postgres) |
 | Payments | Stripe SDK (`stripe`, pinned `22.6.1`), test mode only |
 | Scheduling | `@nestjs/schedule` (pinned `6.1.3` — the next major is ESM-only and breaks `ts-jest`, same class of issue as `@nestjs/config`, see `decisions.md`), in-process `@Cron()` jobs |

@@ -36,6 +36,3 @@ What needed my judgment, not the skills': whether to bundle `forgotPassword`'s f
 
 **Limitations:**
 - `research-options` was authored but never actually exercised this session — no library-behavior question came up that needed it, so it's reviewed and designed but unverified in real use.
-- The Redis-dependent e2e suite only passes once `docker compose up -d` has been run first; the skills don't stand up that infrastructure themselves — an earlier `/verify-fix` run correctly reported it as a pre-existing infra gap ("not run" / environment limitation) rather than forcing a pass.
-- The `docs/decisions.md` restructuring landed at ~54% reduction, short of my own stated 55-65% estimate and further still from the ~70% originally requested — a deliberate stopping point (see Before → after), not an oversight, but still an open trade-off between conciseness and preserved historical detail that a human reviewer might weigh differently.
-- No PR is open yet for `feat/ai-skills` — commits are pushed to the branch, but review and merge are still pending.

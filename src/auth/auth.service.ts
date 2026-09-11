@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import ms from 'ms';
@@ -33,6 +33,8 @@ interface SessionUser {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwordService: PasswordService,
@@ -142,7 +144,19 @@ export class AuthService {
       return updated;
     });
 
-    await this.mailService.sendPasswordChangedEmail(user.email, user.firstName);
+    // The password change and session revocation already committed above —
+    // a failed notification email must not be reported as a failed reset.
+    try {
+      await this.mailService.sendPasswordChangedEmail(
+        user.email,
+        user.firstName,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password-changed email to ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
   }
 
   private async issueSession(

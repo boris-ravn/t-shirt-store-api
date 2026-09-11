@@ -42,6 +42,10 @@ const ORDER_INCLUDE = {
   shippingDetails: true,
   user: { select: { id: true, email: true, firstName: true, lastName: true } },
   promoCode: { select: { id: true, code: true } },
+  // Filtered to the succeeded payment, not the most recent one — a failed
+  // payment_intent attempt followed by a successful payment_link retry must
+  // report payment_link, and only the partial unique index on
+  // (order_id) WHERE status = 'succeeded' guarantees at most one such row.
   payments: {
     where: { status: PaymentStatus.succeeded },
     select: { method: true },
@@ -167,6 +171,9 @@ export class OrdersService {
             })),
           },
           statusHistory: {
+            // changedBy is the ordering client, not null — null is reserved
+            // for transitions with no human in the loop (a webhook), but
+            // order creation is a direct, synchronous client action.
             create: { status: OrderStatus.pending, changedBy: user.id },
           },
         },

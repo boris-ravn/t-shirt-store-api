@@ -1,0 +1,17 @@
+{
+  "skill_name": "observability",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/observability Sweep src/auth and src/notifications for error-handling and logging gaps around external calls (mail, the BullMQ queue).",
+      "expected_output": "A ranked list of findings including the unguarded mailService.send... calls in auth.service.ts's forgotPassword/resetPassword (high severity — failure after a committed DB action) and the DB-only, never-logged failure branch in stock-notifications.processor.ts (medium severity — operationally invisible), each with file:line, what's missing, and why it matters. No proposed fix code.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/observability Check the whole app for places where a Stripe or S3 call could throw past a committed database write.",
+      "expected_output": "A scoped sweep across payments and storage modules, correctly excluding plain PrismaService calls (out of scope per the skill), ranking any unguarded post-commit external call as high severity, and explicitly not producing a fix — just findings.",
+      "files": []
+    }
+  ]
+}

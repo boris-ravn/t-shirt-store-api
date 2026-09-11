@@ -1,0 +1,17 @@
+{
+  "skill_name": "investigate-task",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/investigate-task Password-reset and password-changed emails in auth.service.ts are sent with an unguarded await — if the SMTP relay fails, the request throws an unhandled exception even though the token was already issued (or the password already changed and sessions revoked). Investigate and propose a fix.",
+      "expected_output": "A plan that opens architecture.md's Auth & authorization section and searches decisions.md for prior mail/observability entries, cites auth.service.ts's forgotPassword/resetPassword plus stock-notifications.processor.ts as the existing queue-based pattern, lists current test coverage (or its absence) for these paths, and proposes implementation + test steps without writing code. Should flag the inline-vs-queue choice as an open decision rather than picking one silently.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/investigate-task A manager reports that cancelling a shipped order sometimes restocks the SKU and sometimes doesn't. Investigate.",
+      "expected_output": "A plan that reads database/README.md §8's five guarded stock transitions before anything else (since cancellation-restock behavior depends on the order's previous status read under lock), locates the relevant service code and its unit/e2e coverage, and proposes a plan — flags if code and docs disagree instead of picking a side.",
+      "files": []
+    }
+  ]
+}

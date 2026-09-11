@@ -1,0 +1,17 @@
+{
+  "skill_name": "docs-sync",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/docs-sync Check whether docs/architecture.md is still accurate for the mail module, now that feat/brevo-smtp shipped authenticated SMTP relay support.",
+      "expected_output": "Identifies architecture.md's Mail stack line as stale (still describes Mailhog-only delivery), proposes the specific doc edit reflecting relay support, and does not touch any source code. Notes decisions.md as a place a supporting entry could go, without inventing a backdated one.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/docs-sync I just merged a change to the promo code redemption logic. Are the docs still in sync?",
+      "expected_output": "Reads docs/database/README.md's promo_codes.times_redeemed section and docs/decisions.md for prior promo-code entries, compares against the current promos service code, and reports drift (if any) or confirms alignment — with lint:openapi run and pasted only if docs/api/ was actually touched by the change.",
+      "files": []
+    }
+  ]
+}

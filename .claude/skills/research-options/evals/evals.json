@@ -1,0 +1,17 @@
+{
+  "skill_name": "research-options",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/research-options Should a non-critical side-effect failure (a password-reset email that fails to send after the reset token was already issued) be handled with an inline try/catch + Logger.error in auth.service.ts, or routed through the existing BullMQ stock-notifications-style queue for retry?",
+      "expected_output": "A decision brief comparing the two approaches, each backed by a doc URL (NestJS docs and/or BullMQ docs matching this repo's pinned bullmq@6.3.4 / @nestjs/bullmq@11.0.5), a verdict on whether each is still current, and a recommendation naming what it trades away against this repo's actual constraints (async/await only, no new dependency without asking).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/research-options does CASL's manage action still implicitly match every other action, the way docs/architecture.md's PromoCode carve-out assumes?",
+      "expected_output": "A cited answer against the installed @casl/ability version (^7.0.1) confirming or correcting the manage-matches-everything assumption, since this is exactly the kind of CASL claim CLAUDE.md flags as high-risk for a superseded answer.",
+      "files": []
+    }
+  ]
+}

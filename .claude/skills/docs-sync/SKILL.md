@@ -10,6 +10,7 @@ description: >
   documented section, even if the user only asked about the code change itself — a
   silently-stale doc is exactly the failure mode this skill exists to catch before it's
   someone else's problem to discover.
+disallowed-tools: Edit, Write, NotebookEdit
 ---
 
 # Docs Sync
@@ -28,9 +29,16 @@ real authenticated-relay support, is a live example of exactly the gap this skil
 
 ### 1. Scope the comparison
 
-A module name, a merged PR or commit range, or "the whole `docs/` tree." For a specific
-change, prefer scoping to what it touched — cheaper and more precise than a full sweep,
-and a full sweep is still available when asked for one.
+A merged PR or commit range, or "the whole `docs/` tree" — both have an unambiguous file
+set to compare. A bare module name is not itself a scope: resolve it to a commit range
+first — `git log --oneline -- <module-dir>` since it last diverged from `main`, or since
+the module's most recent `docs/decisions.md` entry, whichever is more recent — and state
+which baseline you used. If the module has no clear "last synced" point (a new module, no
+prior `decisions.md` entry), say so and ask for an explicit commit range instead of
+silently running a full audit against no baseline.
+
+For a specific change, prefer scoping to what it touched — cheaper and more precise than a
+full sweep, and a full sweep is still available when asked for one.
 
 ### 2. Identify which doc sections govern the scope
 
@@ -83,7 +91,7 @@ worth including rather than skipping.
 
 ```markdown
 ## Scope
-<module / PR range / whole docs tree>
+<PR range / whole docs tree / module name resolved to a commit range, with the baseline stated>
 
 ## Doc files checked
 <each file, with the section(s) relevant to scope>

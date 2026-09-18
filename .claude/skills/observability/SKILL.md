@@ -10,6 +10,7 @@ description: >
   feedback mentions observability, logging, or service-failure handling — trigger this
   even if the user doesn't name a specific bug, since the point of this skill is to
   surface problems nobody has reported yet.
+disallowed-tools: Bash, Edit, Write, NotebookEdit
 ---
 
 # Observability Audit

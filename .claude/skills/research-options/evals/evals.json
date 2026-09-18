@@ -5,13 +5,25 @@
       "id": 1,
       "prompt": "/research-options Should a non-critical side-effect failure (a password-reset email that fails to send after the reset token was already issued) be handled with an inline try/catch + Logger.error in auth.service.ts, or routed through the existing BullMQ stock-notifications-style queue for retry?",
       "expected_output": "A decision brief comparing the two approaches, each backed by a doc URL (NestJS docs and/or BullMQ docs matching this repo's pinned bullmq@6.3.4 / @nestjs/bullmq@11.0.5), a verdict on whether each is still current, and a recommendation naming what it trades away against this repo's actual constraints (async/await only, no new dependency without asking).",
-      "files": []
+      "files": [],
+      "actual_result": {
+        "date": "2026-09-18",
+        "run_type": "cold, fresh session, no repo context beyond SKILL.md",
+        "status": "pass",
+        "notes": "Pinned bullmq@6.3.4 / @nestjs/bullmq@11.0.5 from package.json, cited docs.bullmq.io and docs.nestjs.com for the queue-retry candidate, cross-checked both against this repo's own already-running notifications module, and named a third candidate (centralizing the swallow in MailService) that the recorded decision had already rejected. Recommended keeping the current inline try/catch, naming the concrete cost (no retry, no queue-visible failure state). Confirmed as re-deriving (not contradicting) the repo's own recorded decision."
+      }
     },
     {
       "id": 2,
       "prompt": "/research-options does CASL's manage action still implicitly match every other action, the way docs/architecture.md's PromoCode carve-out assumes?",
       "expected_output": "A cited answer against the installed @casl/ability version (^7.0.1) confirming or correcting the manage-matches-everything assumption, since this is exactly the kind of CASL claim CLAUDE.md flags as high-risk for a superseded answer.",
-      "files": []
+      "files": [],
+      "actual_result": {
+        "date": "2026-09-18",
+        "run_type": "cold, fresh session, no repo context beyond SKILL.md",
+        "status": "pass",
+        "notes": "Confirmed the installed @casl/ability version (7.0.1, matching package-lock.json), cited the installed source (node_modules/@casl/ability/dist/cjs/index.cjs) and the bundled README as ground truth, and additionally ran the repo's own casl-ability.factory.spec.ts (99/99 passing) as corroboration. Verdict: valid at the pinned version, no code change needed. Correctly treated this as a single-candidate factual verification rather than forcing an artificial comparison."
+      }
     }
   ]
 }

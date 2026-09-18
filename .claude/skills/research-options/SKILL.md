@@ -13,6 +13,7 @@ description: >
   proactively whenever you're about to state an API signature, a "does X still work this
   way" claim, or a "best practice" recommendation without already having a doc URL or a
   file:line in this repo to back it up.
+disallowed-tools: Bash, Edit, Write, NotebookEdit
 ---
 
 # Research Options

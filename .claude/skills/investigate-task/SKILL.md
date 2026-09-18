@@ -10,6 +10,7 @@ description: >
   governing doc section before writing code in those areas (a past summary drifted and
   asserted a removed column plus an oversell-permitting guard within a day), and this
   skill enforces that instead of relying on memory of a prior session or of the docs.
+disallowed-tools: Bash, Edit, Write, NotebookEdit
 ---
 
 # Investigate Task

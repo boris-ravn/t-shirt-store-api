@@ -1,0 +1,42 @@
+Check: unit tests for AuthService.forgotPassword / AuthService.resetPassword
+Base SHA: 651d55f6ffa4c87ad29a19f0c45210482e41d2ab (merge-base of feat/ai-skills and main)
+Fix SHA: eaef966 (auth.service.spec.ts as of this commit, laid over the base SHA's auth.service.ts)
+Command: npm test -- auth.service.spec
+Exit status: 1
+
+Reproduction: `git worktree add <tmp> 651d55f6ffa4c87ad29a19f0c45210482e41d2ab`, then
+`git show eaef966:src/auth/auth.service.spec.ts > <tmp>/src/auth/auth.service.spec.ts` to lay
+the fix commit's test file (which already contains the two new failure-path tests) over the
+pre-fix `auth.service.ts`, then ran the command below inside the worktree.
+
+--- real terminal output ---
+> t-shirt-store-api@0.0.1 test
+> jest auth.service.spec
+
+FAIL src/auth/auth.service.spec.ts
+  ● AuthService › forgotPassword › still resolves when sendPasswordResetEmail rejects, so an existing account is indistinguishable from an unknown one
+
+    expect(received).resolves.toBeUndefined()
+
+    Received promise rejected instead of resolved
+    Rejected to value: [Error: SMTP unreachable]
+
+      at expect (../node_modules/expect/build/index.js:2116:15)
+      at Object.<anonymous> (auth/auth.service.spec.ts:322:13)
+
+  ● AuthService › resetPassword › still resolves and leaves the password change in place when sendPasswordChangedEmail rejects
+
+    expect(received).resolves.toBeUndefined()
+
+    Received promise rejected instead of resolved
+    Rejected to value: [Error: SMTP unreachable]
+
+      at expect (../node_modules/expect/build/index.js:2116:15)
+      at Object.<anonymous> (auth/auth.service.spec.ts:414:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 14 passed, 16 total
+Snapshots:   0 total
+Time:        2.877 s
+Ran all test suites matching auth.service.spec.
+EXIT_CODE=1

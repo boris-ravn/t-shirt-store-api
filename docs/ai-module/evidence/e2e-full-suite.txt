@@ -1,0 +1,31 @@
+Check: full e2e suite (real Postgres via Testcontainers, real Redis/Mailhog/MinIO via docker compose)
+SHA: 9159df1 (feat/ai-skills tip after the mentor-review remediation commits)
+Command: docker compose up -d && npm run test:e2e
+Exit status: 0
+Date: 2026-09-18
+
+Context: during the remediation work earlier in this session, the local Docker daemon was
+unavailable, so every check in this session that needed it (verify-fix's cold-run
+reproduction, both verify-fix eval cold runs) correctly reported test:e2e as "not run — no
+Docker daemon available" rather than a fabricated pass, per this repo's own hard rule and
+the verify-fix skill's own instructions. Docker was brought back up after that work, and the
+full suite was run for real below — nothing in this session ever reported an assumed or
+fabricated e2e pass while Docker was down.
+
+Suites (4): test/auth.e2e-spec.ts, test/catalog.e2e-spec.ts, test/checkout.e2e-spec.ts,
+test/order-history.e2e-spec.ts — includes the Redis/Mailhog-dependent low-stock
+notification test in checkout.e2e-spec.ts.
+
+--- real terminal output (summary; full migration/container logs omitted) ---
+Test Suites: 4 passed, 4 total
+Tests:       35 passed, 35 total
+Snapshots:   0 total
+Time:        38.319 s
+Ran all test suites.
+EXIT_CODE=0
+
+Note: the auth mail-failure fix itself (this module's improvement) has no dedicated e2e
+coverage — confirmed independently by the cold investigate-task run
+(.claude/skills/investigate-task/evals/evals.json, eval 1) — so this suite does not add a
+before/after for that specific fix. It confirms the rest of the app's real-service
+integration coverage is unaffected by this session's changes.

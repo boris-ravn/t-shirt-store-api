@@ -33,7 +33,7 @@ Not every change needs every gate. Pick from this repo's real scripts
 
 | Script | When it applies |
 |---|---|
-| `npm run lint` | any `.ts` change |
+| `npx eslint "{src,apps,libs,test}/**/*.ts"` | any `.ts` change — **not** `npm run lint`, which runs with `--fix` and can silently repair the violation this skill exists to capture (matches CI's own lint step; see `docs/decisions.md`'s CI entry and this skill's own "Failure mode to avoid") |
 | `npm run build` | any `.ts` change |
 | `npm run test` | any change touching a service/controller with unit coverage |
 | `npm run test:e2e` | any change to request/response behavior or persisted state — needs Docker (Testcontainers Postgres, plus Redis/Mailhog for the low-stock and checkout specs) |
@@ -44,18 +44,30 @@ without a Docker daemon), say so explicitly and report it as **not run**, not as
 
 ### 2. Capture the BEFORE state
 
-Before the fix lands, do one of:
-- run the relevant check(s) against the current code and show the real failure output, or
-- if nothing currently fails outright (a coverage gap rather than a red test), write or
-  point at the specific test that would fail once it exists, and show it failing first —
-  never claim a gap is closed without having seen it fail once.
+Before the fix lands, reach the pre-fix state mechanically — never by hand-editing files
+back to an old version:
 
-Paste the actual terminal output. Do not paraphrase a failure — the exact error, stack
-trace, or assertion message is the evidence.
+1. Find the base commit — the merge-base with `main`, or whatever SHA the task names.
+2. `git worktree add <tmp-path> <base-sha>` to get a second checkout of the pre-fix code
+   without touching the current working tree.
+3. If the fix's evidence is a new test that doesn't exist at the base SHA (a coverage gap
+   rather than a red test), copy exactly one test — the specific test file, or just the
+   new test case — into the worktree: `git show <fix-sha>:<path/to/spec.ts> >
+   <tmp-path>/<path/to/spec.ts>`. Never claim a gap is closed without having seen it fail
+   once.
+4. Run the relevant check(s) from step 1 inside `<tmp-path>`. This is the FAIL side of the
+   table.
+5. `git worktree remove <tmp-path>` to clean up.
+
+Paste the actual terminal output, the exact command, and the exit status. Do not
+paraphrase a failure — the exact error, stack trace, or assertion message is the evidence.
 
 ### 3. Confirm the fix is in place
 
-This skill checks; it doesn't implement. The fix should already exist (typically from
+This skill checks, and may author the single reproduction test a coverage gap needs — it
+never writes or edits implementation code. If proving a gap needs more than one test, or
+any change outside a test file, stop and hand it back to `investigate-task` instead of
+expanding scope here. The fix itself should already exist (typically from
 `investigate-task`'s plan, or an `observability` finding, being implemented). Confirm
 you're checking the intended diff, not a stale working tree.
 
@@ -67,10 +79,10 @@ Re-run the exact same check(s) from step 1. Paste the real output again.
 
 ```markdown
 ## Checks run
-| Check | Before | After |
-|---|---|---|
-| <script/test name> | FAIL — <one-line reason> | PASS |
-| test:e2e | not run — no Docker daemon available | not run — no Docker daemon available |
+| Check | Base SHA | Fix SHA | Command | Before | After |
+|---|---|---|---|---|---|
+| <script/test name> | <sha> | <sha> | `<exact command>` | FAIL (exit <n>) — <one-line reason> | PASS (exit 0) |
+| test:e2e | — | — | — | not run — no Docker daemon available | not run — no Docker daemon available |
 
 ## Evidence
 <the real pasted output for each check that actually ran, before and after>

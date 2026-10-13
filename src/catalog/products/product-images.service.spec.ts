@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImageUrlService } from '../../storage/image-url.service';
@@ -67,6 +67,10 @@ describe('ProductImagesService', () => {
     }).compile();
 
     service = module.get(ProductImagesService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   const validFile = {
@@ -164,6 +168,55 @@ describe('ProductImagesService', () => {
       });
       expect(result.position).toBe(2);
       expect(result.url).toBe('https://example.com/image.png');
+    });
+
+    it('deletes the uploaded S3 object and rethrows when the image row fails to persist', async () => {
+      expect.hasAssertions();
+      prisma.product.findUnique.mockResolvedValue({
+        id: 'product-1',
+        deletedAt: null,
+      });
+      prisma.productImage.aggregate.mockResolvedValue({
+        _max: { position: null },
+      });
+      const dbError = new Error('db down');
+      prisma.productImage.create.mockRejectedValue(dbError);
+
+      const error = await service
+        .upload('product-1', validFile)
+        .catch((e: unknown) => e);
+
+      const [uploadedKey] = s3Service.upload.mock.calls[0] as [string];
+      expect(error).toBe(dbError);
+      expect(s3Service.delete).toHaveBeenCalledTimes(1);
+      expect(s3Service.delete).toHaveBeenCalledWith(uploadedKey);
+    });
+
+    it('rethrows the original DB error when the S3 cleanup also fails', async () => {
+      expect.hasAssertions();
+      prisma.product.findUnique.mockResolvedValue({
+        id: 'product-1',
+        deletedAt: null,
+      });
+      prisma.productImage.aggregate.mockResolvedValue({
+        _max: { position: null },
+      });
+      const dbError = new Error('db down');
+      prisma.productImage.create.mockRejectedValue(dbError);
+      s3Service.delete.mockRejectedValue(new Error('s3 down'));
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+      const error = await service
+        .upload('product-1', validFile)
+        .catch((e: unknown) => e);
+
+      const [uploadedKey] = s3Service.upload.mock.calls[0] as [string];
+      expect(error).toBe(dbError);
+      expect(s3Service.delete).toHaveBeenCalledWith(uploadedKey);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(uploadedKey),
+      );
     });
   });
 

@@ -81,8 +81,8 @@ export class ProductImagesService {
   // Hard delete — an image is never referenced by an order.
   async delete(productId: string, imageId: string): Promise<void> {
     const image = await this.assertImageExists(productId, imageId);
-    await this.s3Service.delete(image.s3Key);
     await this.prisma.productImage.delete({ where: { id: imageId } });
+    await this.deleteFromS3(image.s3Key);
   }
 
   private async deleteFromS3(s3Key: string) {

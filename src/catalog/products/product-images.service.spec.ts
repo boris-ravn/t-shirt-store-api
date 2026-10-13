@@ -283,20 +283,54 @@ describe('ProductImagesService', () => {
       expect(prisma.productImage.delete).not.toHaveBeenCalled();
     });
 
-    it('deletes from S3 before deleting the DB row', async () => {
+    it('deletes the DB row before the S3 object', async () => {
+      expect.hasAssertions();
       prisma.productImage.findUnique.mockResolvedValue(existingImage);
       prisma.productImage.delete.mockResolvedValue(existingImage);
 
       await service.delete(existingImage.productId, existingImage.id);
 
-      expect(s3Service.delete).toHaveBeenCalledWith(existingImage.s3Key);
       expect(prisma.productImage.delete).toHaveBeenCalledWith({
         where: { id: existingImage.id },
       });
-      const s3DeleteOrder = s3Service.delete.mock.invocationCallOrder[0];
+      expect(s3Service.delete).toHaveBeenCalledWith(existingImage.s3Key);
       const dbDeleteOrder =
         prisma.productImage.delete.mock.invocationCallOrder[0];
-      expect(s3DeleteOrder).toBeLessThan(dbDeleteOrder);
+      const s3DeleteOrder = s3Service.delete.mock.invocationCallOrder[0];
+      expect(dbDeleteOrder).toBeLessThan(s3DeleteOrder);
+    });
+
+    it('does not delete the S3 object when the DB delete fails', async () => {
+      expect.hasAssertions();
+      prisma.productImage.findUnique.mockResolvedValue(existingImage);
+      const dbError = new Error('db down');
+      prisma.productImage.delete.mockRejectedValue(dbError);
+
+      const error = await service
+        .delete(existingImage.productId, existingImage.id)
+        .catch((e: unknown) => e);
+
+      expect(error).toBe(dbError);
+      expect(s3Service.delete).not.toHaveBeenCalled();
+    });
+
+    it('resolves when the S3 delete fails after the row is gone', async () => {
+      expect.hasAssertions();
+      prisma.productImage.findUnique.mockResolvedValue(existingImage);
+      prisma.productImage.delete.mockResolvedValue(existingImage);
+      s3Service.delete.mockRejectedValue(new Error('s3 down'));
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+      const result = await service
+        .delete(existingImage.productId, existingImage.id)
+        .catch((e: unknown) => e);
+
+      expect(result).toBeUndefined();
+      expect(s3Service.delete).toHaveBeenCalledWith(existingImage.s3Key);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(existingImage.s3Key),
+      );
     });
   });
 });

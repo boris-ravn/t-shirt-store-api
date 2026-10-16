@@ -345,9 +345,11 @@ InternalServerError:
 ServiceUnavailable:
   description: >
     A dependency this operation needs (the database, the payment provider,
-    object storage, the mail relay) is temporarily unreachable. Safe to
-    retry after `Retry-After` seconds. Which dependency failed is never
-    disclosed.
+    object storage, the mail relay) is temporarily unreachable. Retry after
+    `Retry-After` seconds — but on a write, the original request may already
+    have taken effect (the connection can drop after a commit, or after the
+    payment provider acted), so check the resource before retrying it.
+    Which dependency failed is never disclosed.
   headers:
     Retry-After:
       description: Seconds to wait before retrying. A fixed hint, not a measurement.

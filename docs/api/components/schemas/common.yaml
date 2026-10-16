@@ -101,6 +101,12 @@ Problem:
         Extension member. Present only when `type` is `validation-error`.
       items:
         $ref: ./common.yaml#/ValidationErrorDetail
+    retryAfterSeconds:
+      type: integer
+      minimum: 0
+      description: >
+        Extension member. Present on `upstream-unavailable` (503), mirroring
+        the `Retry-After` header.
   required:
     - type
     - title

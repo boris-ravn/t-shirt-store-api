@@ -17,6 +17,8 @@
         $ref: ../components/responses.yaml#/Forbidden
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/cart/items:
   post:
@@ -50,6 +52,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   delete:
     operationId: clearCart
     summary: Remove every item from the caller's cart
@@ -64,6 +68,8 @@
         $ref: ../components/responses.yaml#/Forbidden
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/cart/items/{cartItemId}:
   patch:
@@ -96,6 +102,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   delete:
     operationId: removeCartItem
     summary: Remove one item from the caller's cart
@@ -114,3 +122,5 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable

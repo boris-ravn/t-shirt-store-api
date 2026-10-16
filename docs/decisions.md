@@ -193,3 +193,11 @@ No secrets are configured: `test/env-setup.ts` already defaults every env var `e
 `npm run lint`'s `--fix` flag mutates files, which would let CI silently repair a fixable violation instead of failing on it — CI runs `npx eslint "{src,apps,libs,test}/**/*.ts"` directly instead, without `--fix`.
 
 `payments.service.ts`'s `createPaymentLinkCheckout` has its own separate local `ORDER_INCLUDE` (not the one in `orders.service.ts`) — missed by the initial investigation, caught by `npm run build` failing once `OrderEntity` required the new fields. Extended identically; no other construction site exists.
+
+### 2026-10-16 — Unreachable dependencies answer 503 `upstream-unavailable`, classified in the exception filter
+
+- Classification lives in `ProblemExceptionFilter` (`classifyUpstreamError`), not in each adapter: Prisma has no single adapter, so the filter would have to classify database errors anyway.
+- Rules come from real captured errors, not docs. Postgres is matched by `meta.driverAdapterError.cause.kind` (the same outage is `P1001` or `P2010`), plus pg's code-less `Connection terminated unexpectedly`, matched by message — `pg` is not pinned; the e2e fails if it's reworded.
+- `extractStatus` only honors `status`/`statusCode` with `expose: true`: a Stripe error's `statusCode` is Stripe's response to us and used to leak as the caller's 401.
+- Accepted: `ENOTFOUND` answers 503 (a mistyped host and a DNS outage look the same).
+- Known gaps: Postgres restart codes `57P01`–`57P03` still answer 500 (shape not captured yet); with Redis down `queue.addBulk()` hangs instead of failing, so the webhook's post-commit enqueue needs a timeout.

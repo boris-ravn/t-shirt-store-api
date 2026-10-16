@@ -140,6 +140,8 @@
         $ref: ../components/responses.yaml#/Forbidden
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   post:
     operationId: createProduct
     summary: Create a product
@@ -171,6 +173,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/products/{productId}:
   get:
@@ -197,6 +201,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   patch:
     operationId: updateProduct
     summary: Update a product
@@ -227,6 +233,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   delete:
     operationId: deleteProduct
     summary: Delete a product
@@ -248,6 +256,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/products/{productId}/images:
   post:
@@ -296,6 +306,8 @@
         $ref: ../components/responses.yaml#/UnsupportedMediaType
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/products/{productId}/images/{imageId}:
   patch:
@@ -332,6 +344,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   delete:
     operationId: deleteProductImage
     summary: Delete a product image
@@ -351,3 +365,5 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable

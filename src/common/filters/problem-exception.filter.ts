@@ -8,6 +8,9 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PROBLEM_BASE_URI, ProblemDocument } from '../problem/problem.types';
+import { classifyUpstreamError } from './upstream-error.util';
+
+const UPSTREAM_RETRY_AFTER_SECONDS = 30;
 
 // Fallback shapes for exceptions that reach here without already being a
 // ProblemDocument (a bare Nest HttpException from a guard, the platform's
@@ -58,14 +61,26 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const problem = this.toProblem(exception);
+    const dependency =
+      exception instanceof HttpException
+        ? undefined
+        : classifyUpstreamError(exception);
+    const problem = dependency
+      ? this.upstreamUnavailableProblem()
+      : this.toProblem(exception);
     problem.instance = request.originalUrl;
 
     if (problem.status >= 500) {
       this.logger.error(
-        `Unhandled error on ${request.method} ${request.originalUrl}`,
+        dependency
+          ? `Upstream dependency '${dependency}' unavailable on ${request.method} ${request.originalUrl}`
+          : `Unhandled error on ${request.method} ${request.originalUrl}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+    }
+
+    if (dependency) {
+      response.setHeader('Retry-After', String(UPSTREAM_RETRY_AFTER_SECONDS));
     }
 
     response
@@ -89,6 +104,17 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     return this.defaultProblem(status ?? HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
+  private upstreamUnavailableProblem(): ProblemDocument {
+    return {
+      type: `${PROBLEM_BASE_URI}/upstream-unavailable`,
+      title: 'Service temporarily unavailable',
+      status: HttpStatus.SERVICE_UNAVAILABLE,
+      detail:
+        'A service this request depends on is temporarily unavailable. Retry later.',
+      retryAfterSeconds: UPSTREAM_RETRY_AFTER_SECONDS,
+    };
+  }
+
   private isProblemDocument(value: unknown): value is ProblemDocument {
     return (
       typeof value === 'object' &&
@@ -99,16 +125,18 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     );
   }
 
-  // Covers errors that never go through Nest's HttpException at all — e.g.
-  // body-parser's JSON-parse failure throws a plain Error carrying
-  // `status`/`statusCode`, not an HttpException. (Multer's own file-size
-  // limit is different: @nestjs/platform-express's transformException
-  // converts it into a real PayloadTooLargeException before it gets here,
-  // so that one is handled by the isProblemDocument/HttpException branch,
-  // via the DEFAULT_PROBLEMS fallback above — not this method.)
+  // `expose` (http-errors, used by body-parser) marks a status meant for the
+  // caller; a Stripe error's `statusCode` is Stripe's response to us.
   private extractStatus(exception: unknown): number | undefined {
     if (typeof exception === 'object' && exception !== null) {
-      const candidate = exception as { status?: unknown; statusCode?: unknown };
+      const candidate = exception as {
+        status?: unknown;
+        statusCode?: unknown;
+        expose?: unknown;
+      };
+      if (candidate.expose !== true) {
+        return undefined;
+      }
       const status = candidate.status ?? candidate.statusCode;
       if (typeof status === 'number') {
         return status;

@@ -101,6 +101,10 @@ Problem:
         Extension member. Present only when `type` is `validation-error`.
       items:
         $ref: ./common.yaml#/ValidationErrorDetail
+    retryAfterSeconds:
+      type: integer
+      minimum: 0
+      description: Extension member. Present only on 503, mirroring `Retry-After`.
   required:
     - type
     - title

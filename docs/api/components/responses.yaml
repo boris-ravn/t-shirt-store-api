@@ -322,7 +322,6 @@ TooManyRequests:
             status: 429
             detail: Too many sign-in attempts. Try again later.
             instance: /v1/auth/sign-in
-            retryAfterSeconds: 60
 
 InternalServerError:
   description: >
@@ -341,3 +340,28 @@ InternalServerError:
             status: 500
             detail: An unexpected error occurred.
             instance: /v1/orders
+
+ServiceUnavailable:
+  description: >
+    A dependency is temporarily unreachable. Retry after `Retry-After`
+    seconds; a write may already have taken effect, so check before retrying.
+  headers:
+    Retry-After:
+      description: Seconds to wait before retrying. A fixed hint, not a measurement.
+      schema:
+        type: integer
+        example: 30
+  content:
+    application/problem+json:
+      schema:
+        $ref: ./schemas/common.yaml#/Problem
+      examples:
+        upstream-unavailable:
+          summary: Declared on every operation; detail is always generic.
+          value:
+            type: https://api.tshirt-store.example/problems/upstream-unavailable
+            title: Service temporarily unavailable
+            status: 503
+            detail: A service this request depends on is temporarily unavailable. Retry later.
+            instance: /v1/orders
+            retryAfterSeconds: 30

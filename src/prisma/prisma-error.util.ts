@@ -20,6 +20,10 @@ export function isRecordNotFound(error: unknown): boolean {
 // Adapter error kinds that mean Postgres itself is unavailable, as opposed
 // to a query being wrong. AuthenticationFailed/DatabaseDoesNotExist are left
 // out on purpose: those are our misconfiguration, not an outage to retry.
+// DatabaseNotReachable also covers an unresolvable host (adapter-pg maps
+// ENOTFOUND to it), so a mistyped DATABASE_URL host answers 503 — accepted,
+// see decisions.md. Shutdown/restart codes (57P01–57P03) arrive as kind
+// 'postgres' and are not matched yet — a known gap, same entry.
 const DATABASE_UNAVAILABLE_KINDS = new Set([
   'DatabaseNotReachable',
   'ConnectionClosed',

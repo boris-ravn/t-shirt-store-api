@@ -5,6 +5,8 @@ import { isDatabaseUnavailable } from '../../prisma/prisma-error.util';
 // dependency to look at without the API advertising its own stack.
 export type UpstreamDependency = 'database' | 'stripe' | 's3' | 'unknown';
 
+// ENOTFOUND/EAI_AGAIN make a mistyped host a 503, not a 500: from inside the
+// process a misconfigured name and a DNS outage look the same (decisions.md).
 const NETWORK_ERROR_CODES = new Set([
   'ECONNREFUSED',
   'ECONNRESET',

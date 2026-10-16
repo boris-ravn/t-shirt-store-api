@@ -17,13 +17,6 @@ export function isRecordNotFound(error: unknown): boolean {
   );
 }
 
-// Adapter error kinds that mean Postgres itself is unavailable, as opposed
-// to a query being wrong. AuthenticationFailed/DatabaseDoesNotExist are left
-// out on purpose: those are our misconfiguration, not an outage to retry.
-// DatabaseNotReachable also covers an unresolvable host (adapter-pg maps
-// ENOTFOUND to it), so a mistyped DATABASE_URL host answers 503 — accepted,
-// see decisions.md. Shutdown/restart codes (57P01–57P03) arrive as kind
-// 'postgres' and are not matched yet — a known gap, same entry.
 const DATABASE_UNAVAILABLE_KINDS = new Set([
   'DatabaseNotReachable',
   'ConnectionClosed',
@@ -31,9 +24,8 @@ const DATABASE_UNAVAILABLE_KINDS = new Set([
   'TooManyConnections',
 ]);
 
-// Reproduced against a stopped Postgres: a model call fails with P1001 but
-// $executeRaw with P2010, so the code alone can't be trusted — the
-// driver-adapter kind is the one field both carry.
+// Matches on the adapter kind, not the code: the same outage is P1001 from a
+// model call and P2010 from $executeRaw.
 export function isDatabaseUnavailable(error: unknown): boolean {
   if (isPgConnectionTerminated(error)) {
     return true;
@@ -47,11 +39,8 @@ export function isDatabaseUnavailable(error: unknown): boolean {
   return typeof kind === 'string' && DATABASE_UNAVAILABLE_KINDS.has(kind);
 }
 
-// When Postgres goes away under an idle pooled connection, pg raises a bare
-// Error with no `code` (node_modules/pg/lib/client.js:204), adapter-pg's
-// convertDriverError matches none of its branches, and that raw error is
-// what reaches us — no Prisma wrapper, no `kind`. The message is the only
-// signal, so it is matched exactly, and only on a code-less Error.
+// pg raises this without a `code` and Prisma passes it through unwrapped, so
+// the message is the only signal.
 const PG_CONNECTION_TERMINATED = 'Connection terminated unexpectedly';
 
 function isPgConnectionTerminated(error: unknown): boolean {

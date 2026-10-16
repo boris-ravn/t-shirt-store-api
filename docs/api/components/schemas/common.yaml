@@ -104,9 +104,7 @@ Problem:
     retryAfterSeconds:
       type: integer
       minimum: 0
-      description: >
-        Extension member. Present on `upstream-unavailable` (503), mirroring
-        the `Retry-After` header.
+      description: Extension member. Present only on 503, mirroring `Retry-After`.
   required:
     - type
     - title

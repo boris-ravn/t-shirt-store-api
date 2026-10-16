@@ -22,9 +22,6 @@ describe('ProblemExceptionFilter', () => {
   };
   let loggerError: jest.SpyInstance;
 
-  // catch() only calls switchToHttp().getResponse()/getRequest(); the
-  // response methods are chained (status().type().send()), so each returns
-  // the same object.
   function fakeHost(method = 'GET', originalUrl = '/v1/orders'): ArgumentsHost {
     return {
       switchToHttp: () => ({
@@ -124,9 +121,7 @@ describe('ProblemExceptionFilter', () => {
     );
   });
 
-  // The slug is not asserted: DEFAULT_PROBLEMS maps any 413/415 to the
-  // image-upload problems, which is wrong for a JSON body and predates this
-  // branch. What this branch must keep is the status reaching the caller.
+  // Slug not asserted: 413/415 map to the image-upload slugs (pre-existing).
   it.each([
     [413, buildBodyTooLargeError()],
     [415, buildUnsupportedCharsetError()],

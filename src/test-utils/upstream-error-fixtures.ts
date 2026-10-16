@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 
-// Shapes copied from real errors captured by pointing each client at a
-// port with nothing listening (decisions.md, 2026-10-16) — not from docs.
+// Shapes captured from the real clients pointed at a closed port.
 
 export function buildStripeConnectionError(): Stripe.errors.StripeConnectionError {
   return new Stripe.errors.StripeConnectionError({
@@ -16,8 +15,6 @@ export function buildStripeAuthenticationError(): Stripe.errors.StripeAuthentica
   });
 }
 
-// nodemailer: a plain Error, `code` rewritten to 'ESOCKET', only `syscall`
-// survives from the socket error.
 export function buildSmtpConnectionError(): Error {
   return Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1025'), {
     errno: -4078,
@@ -29,7 +26,6 @@ export function buildSmtpConnectionError(): Error {
   });
 }
 
-// AWS SDK v3: the socket error itself, plus the SDK's `$metadata`.
 export function buildS3ConnectionError(): Error {
   return Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:9000'), {
     errno: -4078,
@@ -39,12 +35,6 @@ export function buildS3ConnectionError(): Error {
   });
 }
 
-// What body-parser hands the filter past its size limit and for a charset it
-// can't decode: http-errors instances, with status/statusCode/expose set by
-// createError (node_modules/http-errors/index.js:92-96). Props copied from
-// node_modules/raw-body/index.js:163 and node_modules/body-parser/lib/read.js:73.
-// A malformed JSON body never arrives here: Nest turns it into a
-// BadRequestException first.
 export function buildBodyTooLargeError(): Error {
   return Object.assign(new Error('request entity too large'), {
     status: 413,

@@ -1,12 +1,8 @@
 import Stripe from 'stripe';
 import { isDatabaseUnavailable } from '../../prisma/prisma-error.util';
 
-// Never sent to the caller — only logged, so an operator knows which
-// dependency to look at without the API advertising its own stack.
 export type UpstreamDependency = 'database' | 'stripe' | 's3' | 'unknown';
 
-// ENOTFOUND/EAI_AGAIN make a mistyped host a 503, not a 500: from inside the
-// process a misconfigured name and a DNS outage look the same (decisions.md).
 const NETWORK_ERROR_CODES = new Set([
   'ECONNREFUSED',
   'ECONNRESET',
@@ -14,14 +10,9 @@ const NETWORK_ERROR_CODES = new Set([
   'ENOTFOUND',
   'EAI_AGAIN',
 ]);
-// nodemailer wraps a refused connection as code 'ESOCKET', keeping only
-// syscall 'connect' from the original socket error.
+// nodemailer replaces the socket's code with 'ESOCKET'; only syscall survives.
 const NETWORK_SYSCALLS = new Set(['connect', 'getaddrinfo']);
 
-// Classifies an error as "a dependency is unavailable, retrying later can
-// succeed" (503) versus anything else (500). A Stripe authentication or
-// invalid-request error is deliberately not here: that is our bug, and
-// retrying it changes nothing.
 export function classifyUpstreamError(
   error: unknown,
 ): UpstreamDependency | undefined {
@@ -36,8 +27,7 @@ export function classifyUpstreamError(
     return 'stripe';
   }
   if (hasNetworkSignature(error) || hasNetworkSignature(causeOf(error))) {
-    // Every AWS SDK v3 error carries `$metadata`; nothing else here does.
-    return isObject(error) && '$metadata' in error ? 's3' : 'unknown';
+    return isAwsSdkError(error) ? 's3' : 'unknown';
   }
   return undefined;
 }
@@ -53,7 +43,10 @@ function hasNetworkSignature(value: unknown): boolean {
   );
 }
 
-// One level only: fetch-based clients wrap the socket error as `cause`.
+function isAwsSdkError(value: unknown): boolean {
+  return isObject(value) && '$metadata' in value;
+}
+
 function causeOf(value: unknown): unknown {
   return isObject(value) ? (value as { cause?: unknown }).cause : undefined;
 }

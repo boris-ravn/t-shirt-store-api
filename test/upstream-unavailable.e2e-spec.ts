@@ -4,8 +4,6 @@ import { bootstrapE2eApp, E2eApp } from './support/e2e-app';
 
 jest.setTimeout(120_000);
 
-// Its own file and its own container on purpose: stopping Postgres
-// mid-suite would break every other test sharing that container.
 describe('Upstream unavailable (e2e)', () => {
   let e2e: E2eApp;
   let loggerError: jest.SpyInstance;
@@ -18,14 +16,10 @@ describe('Upstream unavailable (e2e)', () => {
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);
 
-    // Leaves idle connections in the pool, so the outage hits a connection
-    // that was open when Postgres went away — pg's bare 'Connection
-    // terminated unexpectedly' Error, not the P1001 a fresh connect gets.
-    // Without this, pg-pool may have already evicted every idle client
-    // (idleTimeoutMillis, 10 s by default) and that path would go untested.
+    // Keeps a pooled connection open, so the outage hits pg's bare Error
+    // rather than the P1001 of a fresh connect.
     await getCategories().expect(200);
 
-    // Stopped here, not in a test, so the assertions only see the outage.
     await e2e.container.stop();
 
     firstOutageResponse = await getCategories();
@@ -34,17 +28,13 @@ describe('Upstream unavailable (e2e)', () => {
 
   afterAll(async () => {
     loggerError.mockRestore();
-    // Not teardownE2eApp: the container is already stopped above.
     await e2e.app.close();
   });
 
-  // A public route, so no sign-in (which would itself need the database).
   function getCategories() {
     return request(e2e.app.getHttpServer()).get('/v1/categories');
   }
 
-  // Guards the exact-message match in isDatabaseUnavailable: if pg rewords
-  // it, this request answers 500 and the log says 'Unhandled error'.
   it("answers 503 when a pooled connection dies with pg's bare Error", () => {
     expect(firstOutageResponse.status).toBe(503);
     expect(firstOutageLog[0]).toBe(

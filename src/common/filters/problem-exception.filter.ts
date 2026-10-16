@@ -10,8 +10,6 @@ import { Request, Response } from 'express';
 import { PROBLEM_BASE_URI, ProblemDocument } from '../problem/problem.types';
 import { classifyUpstreamError } from './upstream-error.util';
 
-// A fixed hint, not a measurement — the API has no way to know when a
-// dependency will be back. Matches the contract's ServiceUnavailable example.
 const UPSTREAM_RETRY_AFTER_SECONDS = 30;
 
 // Fallback shapes for exceptions that reach here without already being a
@@ -63,8 +61,6 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    // An HttpException already states its own status — even one built with
-    // a network error as its `cause` must not be reclassified as a 503.
     const dependency =
       exception instanceof HttpException
         ? undefined
@@ -129,20 +125,8 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     );
   }
 
-  // Covers errors that never go through Nest's HttpException at all — e.g.
-  // body-parser's size-limit (413) and unsupported-charset/encoding (415)
-  // errors, plain Errors carrying `status`/`statusCode`. Its JSON-parse
-  // failure does not land here: Nest maps a SyntaxError to a
-  // BadRequestException first (@nestjs/core routes-resolver.js
-  // mapExternalException). Multer's file-size limit doesn't either:
-  // @nestjs/platform-express's transformException converts it into a real
-  // PayloadTooLargeException, handled by the HttpException branch above.
-  //
-  // Only honored when the error sets `expose: true`, the http-errors
-  // convention body-parser follows. A third-party SDK error can carry a
-  // `statusCode` too — Stripe's is the status *Stripe* returned to us, so
-  // our own bad API key would otherwise reach the caller as their 401, and
-  // skip the >= 500 log entirely.
+  // `expose` (http-errors, used by body-parser) marks a status meant for the
+  // caller; a Stripe error's `statusCode` is Stripe's response to us.
   private extractStatus(exception: unknown): number | undefined {
     if (typeof exception === 'object' && exception !== null) {
       const candidate = exception as {

@@ -15,8 +15,6 @@ export function buildUniqueConstraintError(
   });
 }
 
-// Same shape @prisma/adapter-pg produced against a stopped Postgres: P1001
-// from a model call, P2010 from $executeRaw — `kind` is what both share.
 export function buildDatabaseUnavailableError(
   kind = 'DatabaseNotReachable',
   code: 'P1001' | 'P2010' = 'P1001',
@@ -35,9 +33,6 @@ export function buildDatabaseUnavailableError(
   );
 }
 
-// What actually reached the filter in upstream-unavailable.e2e-spec.ts once
-// Postgres stopped under idle pooled connections: pg's own bare Error,
-// unwrapped by Prisma.
 export function buildPgConnectionTerminatedError(): Error {
   return new Error('Connection terminated unexpectedly');
 }

@@ -51,8 +51,6 @@ describe('classifyUpstreamError', () => {
     expect(classifyUpstreamError(coded)).toBeUndefined();
   });
 
-  // pg's message when the pool itself is shutting down (client.js:204) —
-  // our own app.close(), not an outage.
   it("does not classify pg's plain 'Connection terminated'", () => {
     expect(
       classifyUpstreamError(new Error('Connection terminated')),
@@ -112,8 +110,6 @@ describe('classifyUpstreamError', () => {
     expect(classifyUpstreamError(buildS3ConnectionError())).toBe('s3');
   });
 
-  // Accepted in decisions.md: an unresolvable host and a DNS outage look
-  // the same from inside the process.
   it.each(['ENOTFOUND', 'EAI_AGAIN'])(
     'classifies a %s DNS failure as an outage',
     (code) => {

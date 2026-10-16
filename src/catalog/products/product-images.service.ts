@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ProductImage } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImageUrlService } from '../../storage/image-url.service';
 import { S3Service } from '../../storage/s3.service';
@@ -13,6 +14,8 @@ import {
 
 @Injectable()
 export class ProductImagesService {
+  private readonly logger = new Logger(ProductImagesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
@@ -36,14 +39,20 @@ export class ProductImagesService {
     // sibling once any image has been deleted (e.g. delete position 0 out
     // of [0,1,2] — two remain, count is 2, and the next upload would also
     // land on 2).
-    const { _max } = await this.prisma.productImage.aggregate({
-      where: { productId },
-      _max: { position: true },
-    });
-    const position = (_max.position ?? -1) + 1;
-    const image = await this.prisma.productImage.create({
-      data: { productId, s3Key, position },
-    });
+    let image: ProductImage;
+    try {
+      const { _max } = await this.prisma.productImage.aggregate({
+        where: { productId },
+        _max: { position: true },
+      });
+      const position = (_max.position ?? -1) + 1;
+      image = await this.prisma.productImage.create({
+        data: { productId, s3Key, position },
+      });
+    } catch (error) {
+      await this.deleteFromS3(s3Key);
+      throw error;
+    }
 
     return ProductImageResponseDto.fromEntity(
       image,
@@ -72,8 +81,19 @@ export class ProductImagesService {
   // Hard delete — an image is never referenced by an order.
   async delete(productId: string, imageId: string): Promise<void> {
     const image = await this.assertImageExists(productId, imageId);
-    await this.s3Service.delete(image.s3Key);
     await this.prisma.productImage.delete({ where: { id: imageId } });
+    await this.deleteFromS3(image.s3Key);
+  }
+
+  private async deleteFromS3(s3Key: string) {
+    try {
+      await this.s3Service.delete(s3Key);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to delete S3 object ${s3Key}; it is now orphaned: ${reason}`,
+      );
+    }
   }
 
   private async assertProductExists(productId: string): Promise<void> {

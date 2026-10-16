@@ -106,9 +106,22 @@ export class ProblemExceptionFilter implements ExceptionFilter {
   // converts it into a real PayloadTooLargeException before it gets here,
   // so that one is handled by the isProblemDocument/HttpException branch,
   // via the DEFAULT_PROBLEMS fallback above — not this method.)
+  //
+  // Only honored when the error sets `expose: true`, the http-errors
+  // convention body-parser follows. A third-party SDK error can carry a
+  // `statusCode` too — Stripe's is the status *Stripe* returned to us, so
+  // our own bad API key would otherwise reach the caller as their 401, and
+  // skip the >= 500 log entirely.
   private extractStatus(exception: unknown): number | undefined {
     if (typeof exception === 'object' && exception !== null) {
-      const candidate = exception as { status?: unknown; statusCode?: unknown };
+      const candidate = exception as {
+        status?: unknown;
+        statusCode?: unknown;
+        expose?: unknown;
+      };
+      if (candidate.expose !== true) {
+        return undefined;
+      }
       const status = candidate.status ?? candidate.statusCode;
       if (typeof status === 'number') {
         return status;

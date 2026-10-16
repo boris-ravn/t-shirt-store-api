@@ -322,7 +322,6 @@ TooManyRequests:
             status: 429
             detail: Too many sign-in attempts. Try again later.
             instance: /v1/auth/sign-in
-            retryAfterSeconds: 60
 
 InternalServerError:
   description: >

@@ -63,7 +63,12 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const dependency = classifyUpstreamError(exception);
+    // An HttpException already states its own status — even one built with
+    // a network error as its `cause` must not be reclassified as a 503.
+    const dependency =
+      exception instanceof HttpException
+        ? undefined
+        : classifyUpstreamError(exception);
     const problem = dependency
       ? this.upstreamUnavailableProblem()
       : this.toProblem(exception);
@@ -125,12 +130,13 @@ export class ProblemExceptionFilter implements ExceptionFilter {
   }
 
   // Covers errors that never go through Nest's HttpException at all — e.g.
-  // body-parser's JSON-parse failure throws a plain Error carrying
-  // `status`/`statusCode`, not an HttpException. (Multer's own file-size
-  // limit is different: @nestjs/platform-express's transformException
-  // converts it into a real PayloadTooLargeException before it gets here,
-  // so that one is handled by the isProblemDocument/HttpException branch,
-  // via the DEFAULT_PROBLEMS fallback above — not this method.)
+  // body-parser's size-limit (413) and unsupported-charset/encoding (415)
+  // errors, plain Errors carrying `status`/`statusCode`. Its JSON-parse
+  // failure does not land here: Nest maps a SyntaxError to a
+  // BadRequestException first (@nestjs/core routes-resolver.js
+  // mapExternalException). Multer's file-size limit doesn't either:
+  // @nestjs/platform-express's transformException converts it into a real
+  // PayloadTooLargeException, handled by the HttpException branch above.
   //
   // Only honored when the error sets `expose: true`, the http-errors
   // convention body-parser follows. A third-party SDK error can carry a

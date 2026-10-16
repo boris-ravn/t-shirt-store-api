@@ -39,11 +39,30 @@ export function buildS3ConnectionError(): Error {
   });
 }
 
-// What body-parser hands the filter for a malformed JSON body (http-errors).
-export function buildExposedClientError(status = 400): Error {
-  return Object.assign(new Error('Unexpected token } in JSON'), {
-    status,
-    statusCode: status,
+// What body-parser hands the filter past its size limit and for a charset it
+// can't decode: http-errors instances, with status/statusCode/expose set by
+// createError (node_modules/http-errors/index.js:92-96). Props copied from
+// node_modules/raw-body/index.js:163 and node_modules/body-parser/lib/read.js:73.
+// A malformed JSON body never arrives here: Nest turns it into a
+// BadRequestException first.
+export function buildBodyTooLargeError(): Error {
+  return Object.assign(new Error('request entity too large'), {
+    status: 413,
+    statusCode: 413,
     expose: true,
+    expected: 204800,
+    length: 204800,
+    limit: 102400,
+    type: 'entity.too.large',
+  });
+}
+
+export function buildUnsupportedCharsetError(): Error {
+  return Object.assign(new Error('unsupported charset "UTF-7"'), {
+    status: 415,
+    statusCode: 415,
+    expose: true,
+    charset: 'utf-7',
+    type: 'charset.unsupported',
   });
 }

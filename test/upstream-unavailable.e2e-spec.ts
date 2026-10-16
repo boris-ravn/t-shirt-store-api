@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import request from 'supertest';
 import { bootstrapE2eApp, E2eApp } from './support/e2e-app';
 
@@ -7,19 +8,32 @@ jest.setTimeout(120_000);
 // mid-suite would break every other test sharing that container.
 describe('Upstream unavailable (e2e)', () => {
   let e2e: E2eApp;
+  let loggerError: jest.SpyInstance;
+  let firstOutageResponse: request.Response;
+  let firstOutageLog: unknown[];
 
   beforeAll(async () => {
     e2e = await bootstrapE2eApp();
+    loggerError = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+
+    // Leaves idle connections in the pool, so the outage hits a connection
+    // that was open when Postgres went away — pg's bare 'Connection
+    // terminated unexpectedly' Error, not the P1001 a fresh connect gets.
+    // Without this, pg-pool may have already evicted every idle client
+    // (idleTimeoutMillis, 10 s by default) and that path would go untested.
+    await getCategories().expect(200);
+
     // Stopped here, not in a test, so the assertions only see the outage.
-    // Observed here: the pool's idle connections die with pg's bare
-    // 'Connection terminated unexpectedly' Error, which Prisma passes
-    // through unwrapped. Once those are evicted, a fresh connect fails as
-    // a P1001 DatabaseNotReachable. Both are classified as a database
-    // outage (isDatabaseUnavailable).
     await e2e.container.stop();
+
+    firstOutageResponse = await getCategories();
+    firstOutageLog = (loggerError.mock.calls as unknown[][])[0] ?? [];
   });
 
   afterAll(async () => {
+    loggerError.mockRestore();
     // Not teardownE2eApp: the container is already stopped above.
     await e2e.app.close();
   });
@@ -28,6 +42,18 @@ describe('Upstream unavailable (e2e)', () => {
   function getCategories() {
     return request(e2e.app.getHttpServer()).get('/v1/categories');
   }
+
+  // Guards the exact-message match in isDatabaseUnavailable: if pg rewords
+  // it, this request answers 500 and the log says 'Unhandled error'.
+  it("answers 503 when a pooled connection dies with pg's bare Error", () => {
+    expect(firstOutageResponse.status).toBe(503);
+    expect(firstOutageLog[0]).toBe(
+      "Upstream dependency 'database' unavailable on GET /v1/categories",
+    );
+    expect(firstOutageLog[1]).toEqual(
+      expect.stringContaining('Error: Connection terminated unexpectedly'),
+    );
+  });
 
   it('answers 503 problem+json upstream-unavailable on a public route', async () => {
     const res = await getCategories();

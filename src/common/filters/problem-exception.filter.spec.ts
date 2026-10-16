@@ -1,11 +1,13 @@
-import { ArgumentsHost, Logger } from '@nestjs/common';
+import { ArgumentsHost, ConflictException, Logger } from '@nestjs/common';
+import Stripe from 'stripe';
 import { buildDatabaseUnavailableError } from '../../test-utils/prisma-error-fixtures';
 import {
-  buildExposedClientError,
+  buildBodyTooLargeError,
   buildS3ConnectionError,
   buildSmtpConnectionError,
   buildStripeAuthenticationError,
   buildStripeConnectionError,
+  buildUnsupportedCharsetError,
 } from '../../test-utils/upstream-error-fixtures';
 import { PROBLEM_BASE_URI } from '../problem/problem.types';
 import { ProblemExceptionFilter } from './problem-exception.filter';
@@ -122,16 +124,61 @@ describe('ProblemExceptionFilter', () => {
     );
   });
 
-  it('still answers 400 malformed-request for an exposed body-parser error', () => {
-    filter.catch(buildExposedClientError(400), fakeHost('POST', '/v1/cart'));
+  // The slug is not asserted: DEFAULT_PROBLEMS maps any 413/415 to the
+  // image-upload problems, which is wrong for a JSON body and predates this
+  // branch. What this branch must keep is the status reaching the caller.
+  it.each([
+    [413, buildBodyTooLargeError()],
+    [415, buildUnsupportedCharsetError()],
+  ])(
+    'still answers %i for an exposed body-parser error, unlogged',
+    (status, error) => {
+      filter.catch(error, fakeHost('POST', '/v1/cart'));
 
-    expect(response.status).toHaveBeenCalledWith(400);
-    expect(sentBody()).toEqual({
-      type: `${PROBLEM_BASE_URI}/malformed-request`,
-      title: 'Malformed request body',
-      status: 400,
-      instance: '/v1/cart',
+      expect(response.status).toHaveBeenCalledWith(status);
+      expect(sentBody()).toMatchObject({ status, instance: '/v1/cart' });
+      expect(response.setHeader).not.toHaveBeenCalled();
+      expect(loggerError).not.toHaveBeenCalled();
+    },
+  );
+
+  it('answers 500 for a statusCode the error does not expose', () => {
+    const error = Object.assign(new Error('upstream said no'), {
+      statusCode: 404,
     });
+
+    filter.catch(error, fakeHost());
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(sentBody()).toMatchObject({
+      type: `${PROBLEM_BASE_URI}/internal-error`,
+      status: 500,
+    });
+    expect(loggerError).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 500 for a StripeInvalidRequestError, not 400', () => {
+    const error = new Stripe.errors.StripeInvalidRequestError({
+      message: 'No such price',
+      statusCode: 400,
+    });
+
+    filter.catch(error, fakeHost());
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.setHeader).not.toHaveBeenCalled();
+    expect(loggerError).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an HttpException status even with a network error as cause', () => {
+    const exception = new ConflictException('Already taken', {
+      cause: buildS3ConnectionError(),
+    });
+
+    filter.catch(exception, fakeHost());
+
+    expect(response.status).toHaveBeenCalledWith(409);
+    expect(sentBody()).not.toHaveProperty('retryAfterSeconds');
     expect(response.setHeader).not.toHaveBeenCalled();
     expect(loggerError).not.toHaveBeenCalled();
   });

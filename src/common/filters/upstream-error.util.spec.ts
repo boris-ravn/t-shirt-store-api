@@ -51,6 +51,22 @@ describe('classifyUpstreamError', () => {
     expect(classifyUpstreamError(coded)).toBeUndefined();
   });
 
+  // pg's message when the pool itself is shutting down (client.js:204) —
+  // our own app.close(), not an outage.
+  it("does not classify pg's plain 'Connection terminated'", () => {
+    expect(
+      classifyUpstreamError(new Error('Connection terminated')),
+    ).toBeUndefined();
+  });
+
+  it('does not classify DatabaseDoesNotExist as an outage', () => {
+    expect(
+      classifyUpstreamError(
+        buildDatabaseUnavailableError('DatabaseDoesNotExist'),
+      ),
+    ).toBeUndefined();
+  });
+
   it('does not classify AuthenticationFailed or a P2002 as an outage', () => {
     expect(
       classifyUpstreamError(
@@ -95,6 +111,20 @@ describe('classifyUpstreamError', () => {
   it('classifies an AWS SDK network error as s3', () => {
     expect(classifyUpstreamError(buildS3ConnectionError())).toBe('s3');
   });
+
+  // Accepted in decisions.md: an unresolvable host and a DNS outage look
+  // the same from inside the process.
+  it.each(['ENOTFOUND', 'EAI_AGAIN'])(
+    'classifies a %s DNS failure as an outage',
+    (code) => {
+      const error = Object.assign(
+        new Error(`getaddrinfo ${code} mail.example.test`),
+        { code, syscall: 'getaddrinfo', hostname: 'mail.example.test' },
+      );
+
+      expect(classifyUpstreamError(error)).toBe('unknown');
+    },
+  );
 
   it('recognises a network error carried on `cause`', () => {
     const socketError = Object.assign(

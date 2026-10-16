@@ -8,6 +8,11 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PROBLEM_BASE_URI, ProblemDocument } from '../problem/problem.types';
+import { classifyUpstreamError } from './upstream-error.util';
+
+// A fixed hint, not a measurement — the API has no way to know when a
+// dependency will be back. Matches the contract's ServiceUnavailable example.
+const UPSTREAM_RETRY_AFTER_SECONDS = 30;
 
 // Fallback shapes for exceptions that reach here without already being a
 // ProblemDocument (a bare Nest HttpException from a guard, the platform's
@@ -58,14 +63,23 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const problem = this.toProblem(exception);
+    const dependency = classifyUpstreamError(exception);
+    const problem = dependency
+      ? this.upstreamUnavailableProblem()
+      : this.toProblem(exception);
     problem.instance = request.originalUrl;
 
     if (problem.status >= 500) {
       this.logger.error(
-        `Unhandled error on ${request.method} ${request.originalUrl}`,
+        dependency
+          ? `Upstream dependency '${dependency}' unavailable on ${request.method} ${request.originalUrl}`
+          : `Unhandled error on ${request.method} ${request.originalUrl}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+    }
+
+    if (dependency) {
+      response.setHeader('Retry-After', String(UPSTREAM_RETRY_AFTER_SECONDS));
     }
 
     response
@@ -87,6 +101,17 @@ export class ProblemExceptionFilter implements ExceptionFilter {
 
     const status = this.extractStatus(exception);
     return this.defaultProblem(status ?? HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  private upstreamUnavailableProblem(): ProblemDocument {
+    return {
+      type: `${PROBLEM_BASE_URI}/upstream-unavailable`,
+      title: 'Service temporarily unavailable',
+      status: HttpStatus.SERVICE_UNAVAILABLE,
+      detail:
+        'A service this request depends on is temporarily unavailable. Retry later.',
+      retryAfterSeconds: UPSTREAM_RETRY_AFTER_SECONDS,
+    };
   }
 
   private isProblemDocument(value: unknown): value is ProblemDocument {

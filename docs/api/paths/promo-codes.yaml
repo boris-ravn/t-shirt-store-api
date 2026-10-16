@@ -27,6 +27,8 @@
         $ref: ../components/responses.yaml#/Conflict
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   get:
     operationId: listPromoCodes
     summary: List promo codes
@@ -89,6 +91,8 @@
         $ref: ../components/responses.yaml#/Forbidden
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/promo-codes/{promoCodeId}:
   get:
@@ -113,6 +117,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   patch:
     operationId: updatePromoCode
     summary: Update a promo code
@@ -143,6 +149,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/promo-codes/validate:
   post:
@@ -181,3 +189,5 @@
         $ref: ../components/responses.yaml#/Conflict
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable

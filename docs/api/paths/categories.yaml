@@ -40,6 +40,8 @@
         $ref: ../components/responses.yaml#/BadRequest
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   post:
     operationId: createCategory
     summary: Create a category
@@ -68,6 +70,8 @@
         $ref: ../components/responses.yaml#/Conflict
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/categories/{categoryId}:
   get:
@@ -89,6 +93,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   patch:
     operationId: updateCategory
     summary: Update a category
@@ -121,6 +127,8 @@
         $ref: ../components/responses.yaml#/Conflict
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
   delete:
     operationId: deleteCategory
     summary: Delete a category
@@ -145,3 +153,5 @@
         $ref: ../components/responses.yaml#/Conflict
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable

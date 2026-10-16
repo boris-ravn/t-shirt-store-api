@@ -27,6 +27,8 @@
         $ref: ../components/responses.yaml#/Conflict
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/checkout/payment-link:
   post:
@@ -61,6 +63,8 @@
         $ref: ../components/responses.yaml#/NotFound
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable
 
 /v1/webhooks/stripe:
   post:
@@ -105,3 +109,5 @@
         $ref: ../components/responses.yaml#/BadRequest
       "500":
         $ref: ../components/responses.yaml#/InternalServerError
+      "503":
+        $ref: ../components/responses.yaml#/ServiceUnavailable

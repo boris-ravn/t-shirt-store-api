@@ -35,6 +35,8 @@ A NestJS + Prisma + PostgreSQL REST API for a T-shirt store: catalog with varian
 
 Every 4xx/5xx returns the same RFC 9457 `application/problem+json` shape (`ProblemExceptionFilter`, global). Services throw typed subclasses of `AppException` (`src/common/exceptions/`); each maps to one `type` slug in the registry. Don't build raw error responses in a controller — throw from the service and let the filter shape it.
 
+An unreachable dependency (Postgres, Stripe, S3, the SMTP relay) is not a bug: the filter classifies it (`src/common/filters/upstream-error.util.ts`) and answers 503 `upstream-unavailable` with `Retry-After`, logging which dependency failed without disclosing it to the caller. Anything unclassified stays a 500. Errors raised outside an HTTP request (the BullMQ worker, the cron sweep, the post-commit queue enqueue) never reach this filter.
+
 ## Auth & authorization
 
 - **Authentication**: JWT access token (short-lived, role embedded, not re-read from the DB per request — see `decisions.md`) + opaque refresh token (sha256-hashed, rotated on use, revocable). `JwtAuthGuard`/`OptionalJwtAuthGuard` applied explicitly per route via `@UseGuards()` — no global guard.

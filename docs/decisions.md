@@ -193,3 +193,26 @@ No secrets are configured: `test/env-setup.ts` already defaults every env var `e
 `npm run lint`'s `--fix` flag mutates files, which would let CI silently repair a fixable violation instead of failing on it — CI runs `npx eslint "{src,apps,libs,test}/**/*.ts"` directly instead, without `--fix`.
 
 `payments.service.ts`'s `createPaymentLinkCheckout` has its own separate local `ORDER_INCLUDE` (not the one in `orders.service.ts`) — missed by the initial investigation, caught by `npm run build` failing once `OrderEntity` required the new fields. Extended identically; no other construction site exists.
+
+### 2026-10-16 — Unreachable dependencies answer 503 `upstream-unavailable`, classified centrally in the exception filter
+
+Before this, a stopped Postgres, Redis or SMTP relay and a plain code bug all produced the same 500 `internal-error`, so neither the caller (retry or not?) nor the log (which dependency?) could tell them apart. Worse, `extractStatus` trusted any error's `statusCode`: a `StripeError` carries the status *Stripe* returned to us, so our own invalid API key reached the caller as their 401 and, being < 500, was never logged.
+
+Classification lives in one place, `classifyUpstreamError` called from `ProblemExceptionFilter`, rather than in each adapter rethrowing its own exception. Rejected alternative: per-adapter rethrows (`S3Service`, `MailService`, Stripe calls). Prisma has no single adapter — every service calls it directly (see the 2026-08-28 layering entry) — so the filter would have had to classify database errors anyway, leaving two mechanisms instead of one.
+
+The rules were written from real error shapes, captured by pointing each client at a port with nothing listening, not from library docs — the same lesson as the `meta.target` entry above:
+- Postgres (`@prisma/adapter-pg`): a model call fails with `P1001` but `$executeRaw` with `P2010`, so the code is useless here; `meta.driverAdapterError.cause.kind` (`DatabaseNotReachable`, plus `ConnectionClosed`/`SocketTimeout`/`TooManyConnections`) is the field both share. `AuthenticationFailed`/`DatabaseDoesNotExist` stay 500 — misconfiguration, not an outage.
+- Stripe: `StripeConnectionError`, `StripeAPIError`, `StripeRateLimitError` → 503. A Stripe rate limit is transient from the caller's side too. `StripeAuthenticationError`/`StripeInvalidRequestError` stay 500 — our bug, retrying changes nothing.
+- nodemailer throws a plain `Error` with `code: 'ESOCKET'`, keeping only `syscall: 'connect'` from the socket error; no reliable class to identify it by, so it falls to a generic network check (Node network codes or `connect`/`getaddrinfo` syscalls, on the error or its `cause`) and is logged as dependency `unknown` — the stack trace already names `MailService`. AWS SDK errors are tagged `s3` by their `$metadata` member.
+
+`extractStatus` now honors `status`/`statusCode` only when the error sets `expose: true` — the `http-errors` convention body-parser uses for a malformed body — so third-party SDK statuses can no longer leak.
+
+`Retry-After` is a fixed 30 seconds, sent as both the header and a `retryAfterSeconds` extension member (same shape as the 429 example). The response body never names the failed dependency.
+
+Known gap, deliberately left for a follow-up: with Redis down, BullMQ's `queue.addBulk()` neither resolves nor rejects (still pending after 30 s, with ioredis' `enableOfflineQueue: false` too), so there is nothing for this filter to classify. Its only caller is the Stripe webhook, after the payment transaction has committed. Needs a timeout around the enqueue, not a classifier rule.
+
+### 2026-10-16 — pg's bare "Connection terminated unexpectedly" also counts as a database outage
+
+The first run of `upstream-unavailable.e2e-spec.ts` answered 500, not 503. The pool's idle connections died when Postgres stopped, and pg raised a bare `Error('Connection terminated unexpectedly')` with no `code` (`node_modules/pg/lib/client.js:204`). adapter-pg's `convertDriverError` matches none of its socket, TLS or driver branches on that shape, so Prisma passed the raw error through, with no `meta.driverAdapterError.cause.kind` to read. The capture behind the entry above only saw a fresh connect to a dead port, never a live pool losing its server.
+
+`isDatabaseUnavailable` now also matches that exact message, only on an `Error` without a `code`. The message is pg's only signal. Rejected alternative: accepting the 500 for the first requests after a crash, up to the number of idle pooled connections. That is the exact moment a caller most needs to know retrying will help. Risk: a pg release that rewords the message silently reverts this to a 500. The e2e catches that, which is why it stops a live pool rather than pointing at an empty port.

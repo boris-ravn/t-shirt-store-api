@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -307,6 +308,28 @@ describe('AuthService', () => {
         'raw-reset-token',
       );
     });
+
+    it('still resolves when sendPasswordResetEmail rejects, so an existing account is indistinguishable from an unknown one', async () => {
+      prisma.user.findUnique.mockResolvedValue(existingUser);
+      passwordResetTokenService.issue.mockResolvedValue('raw-reset-token');
+      mailService.sendPasswordResetEmail.mockRejectedValue(
+        new Error('SMTP unreachable'),
+      );
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+
+      await expect(
+        service.forgotPassword({ email: existingUser.email }),
+      ).resolves.toBeUndefined();
+
+      expect(passwordResetTokenService.issue).toHaveBeenCalledWith(
+        existingUser.id,
+      );
+      expect(errorSpy).toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+    });
   });
 
   describe('resetPassword', () => {
@@ -373,6 +396,28 @@ describe('AuthService', () => {
       expect(prisma.$transaction.mock.invocationCallOrder[0]).toBeLessThan(
         Math.min(updateOrder, revokeOrder),
       );
+    });
+
+    it('still resolves and leaves the password change in place when sendPasswordChangedEmail rejects', async () => {
+      passwordResetTokenService.consume.mockResolvedValue({
+        userId: existingUser.id,
+      });
+      passwordService.hash.mockResolvedValue('new-hashed-password');
+      prisma.user.update.mockResolvedValue(existingUser);
+      mailService.sendPasswordChangedEmail.mockRejectedValue(
+        new Error('SMTP unreachable'),
+      );
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation();
+
+      await expect(service.resetPassword(dto)).resolves.toBeUndefined();
+
+      expect(prisma.user.update).toHaveBeenCalled();
+      expect(refreshTokenService.revokeAllForUser).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+
+      errorSpy.mockRestore();
     });
   });
 });

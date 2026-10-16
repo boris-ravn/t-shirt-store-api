@@ -57,8 +57,9 @@ docs/api/openapi.bundled.yaml
 /src/generated/prisma
 
 # Prisma's best-effort agent-skill install (`prisma init`) — local tooling,
-# not project source.
+# not project source. .claude/skills is deliberately NOT listed here: it
+# holds project-authored skills that are real project source now, not
+# prisma-init scaffolding.
 /.agents
-/.claude/skills
 /.windsurf
 /skills-lock.json

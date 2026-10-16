@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import ms from 'ms';
@@ -33,6 +33,8 @@ interface SessionUser {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwordService: PasswordService,
@@ -119,11 +121,22 @@ export class AuthService {
     }
 
     const token = await this.passwordResetTokenService.issue(user.id);
-    await this.mailService.sendPasswordResetEmail(
-      user.email,
-      user.firstName,
-      token,
-    );
+    // Must resolve the same way whether delivery succeeds or fails — the
+    // "always resolves" enumeration guarantee above only holds if a mail
+    // failure for an existing account can't produce a different response
+    // than the early return above does for an unknown one.
+    try {
+      await this.mailService.sendPasswordResetEmail(
+        user.email,
+        user.firstName,
+        token,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password-reset email to ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
   }
 
   async resetPassword(dto: ResetPasswordRequestDto): Promise<void> {
@@ -142,7 +155,19 @@ export class AuthService {
       return updated;
     });
 
-    await this.mailService.sendPasswordChangedEmail(user.email, user.firstName);
+    // The password change and session revocation already committed above —
+    // a failed notification email must not be reported as a failed reset.
+    try {
+      await this.mailService.sendPasswordChangedEmail(
+        user.email,
+        user.firstName,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password-changed email to ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
   }
 
   private async issueSession(

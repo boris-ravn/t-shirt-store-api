@@ -1,0 +1,29 @@
+{
+  "skill_name": "verify-fix",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/verify-fix Verify the fix for the unguarded mail-send in auth.service.ts's forgotPassword and changePassword methods. Show it failing before (or the missing-coverage gap) and passing after.",
+      "expected_output": "A before/after table naming which npm script(s) ran (lint, test at minimum), the real pasted output for each, an honest 'not run' entry for test:e2e if no Docker daemon is available rather than a fabricated pass, and no --no-verify/--fix shortcuts used to force green.",
+      "files": [],
+      "actual_result": {
+        "date": "2026-09-18",
+        "run_type": "cold, fresh session, no repo context beyond SKILL.md",
+        "status": "pass",
+        "notes": "Independently found both fix commits (24a99ca, eaef966), used the new git-worktree procedure to reproduce the pre-fix failure (2 failed / 14 passed / 16 total, exit 1) and the post-fix pass (16/16, exit 0), ran npx eslint (not npm run lint) and npm run build, correctly reported test:e2e as 'not run — no Docker daemon available'. Full output: docs/ai-module/evidence/verify-fix-cold-run.md. Surfaced two real gaps not covered by the skill's current wording: no guidance for a fix spanning more than one commit/test, and no guidance for a worktree missing installed deps / generated Prisma client — both were worked around by the agent, not blocking, but worth a future revision."
+      }
+    },
+    {
+      "id": 2,
+      "prompt": "/verify-fix I just changed docs/api/paths/orders.yaml to add a new response field. Confirm the contract is still valid.",
+      "expected_output": "Runs npm run lint:openapi specifically (not the full suite blindly), pastes the real Spectral/Redocly output, and reports PASS/FAIL honestly — correctly scopes down to the relevant check instead of running everything by default.",
+      "files": [],
+      "actual_result": {
+        "date": "2026-09-18",
+        "run_type": "cold, fresh session, no repo context beyond SKILL.md",
+        "status": "pass",
+        "notes": "Correctly scoped to npm run lint:openapi only, ran it for real (exit 0, one pre-existing unrelated Spectral warning on payments.yaml correctly noted as not a new failure), skipped lint/build/test/test:e2e with stated reasons. Found a real gap: the skill's before/after workflow (steps 2-4) assumes a fix with a diff to reproduce; this eval has no actual code change, so there's no 'before' state to mechanically reach. The skill gives no guidance for a single-shot 'is the contract currently valid' check with no fix/diff — worth a future addition (e.g. 'if there's no fix/diff to compare, skip §2-4 and report the current state once')."
+      }
+    }
+  ]
+}

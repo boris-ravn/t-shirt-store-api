@@ -1,0 +1,15 @@
+Check: unit tests for AuthService.forgotPassword / AuthService.resetPassword
+SHA: 2631ddd (current feat/ai-skills tip, includes fixes 24a99ca + eaef966)
+Command: npm test -- auth.service.spec
+Exit status: 0
+
+--- real terminal output ---
+> t-shirt-store-api@0.0.1 test
+> jest auth.service.spec
+
+Test Suites: 1 passed, 1 total
+Tests:       16 passed, 16 total
+Snapshots:   0 total
+Time:        6.859 s
+Ran all test suites matching auth.service.spec.
+EXIT_CODE=0
